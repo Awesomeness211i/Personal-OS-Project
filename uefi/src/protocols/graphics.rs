@@ -36,12 +36,12 @@ pub struct GraphicsOutputProtocol {
 	pub mode: *mut GraphicsOutputProtocolMode,
 }
 impl GraphicsOutputProtocol {
-	pub fn grapics_color(color: u32, mask: &PixelBitmask) -> GraphicsPixel {
+	pub const fn grapics_color(color: u32, mask: &PixelBitmask) -> GraphicsPixel {
 		GraphicsPixel {
-			blue: (color >> mask.bluemask.trailing_zeros()) as u8,
-			green: (color >> mask.greenmask.trailing_zeros()) as u8,
-			red: (color >> mask.redmask.trailing_zeros()) as u8,
-			reserved: (color >> mask.reservedmask.trailing_zeros()) as u8,
+			blue: (color >> mask.blue_mask.trailing_zeros()) as u8,
+			green: (color >> mask.green_mask.trailing_zeros()) as u8,
+			red: (color >> mask.red_mask.trailing_zeros()) as u8,
+			reserved: (color >> mask.reserved_mask.trailing_zeros()) as u8,
 		}
 	}
 }
@@ -56,7 +56,7 @@ pub struct GraphicsOutputProtocolMode {
 	pub max_mode: u32,
 	pub mode: u32,
 	pub info: *const GraphicsOutputModeInformation,
-	pub sizeofinfo: usize,
+	pub size_of_info: usize,
 	pub framebuffer_base: PhysicalAddress,
 	pub framebuffer_size: usize,
 }
@@ -65,28 +65,28 @@ pub struct GraphicsOutputProtocolMode {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct GraphicsOutputModeInformation {
 	pub version: u32,
-	pub horizontalresolution: u32,
-	pub verticalresolution: u32,
-	pub pixelformat: GraphicsPixelFormat,
-	pub pixelinfo: PixelBitmask,
-	pub pixelsperscanline: u32,
+	pub horizontal_resolution: u32,
+	pub vertical_resolution: u32,
+	pub pixel_format: GraphicsPixelFormat,
+	pub pixel_info: PixelBitmask,
+	pub pixels_per_scanline: u32,
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash)]
 pub struct PixelBitmask {
-	redmask: u32,
-	greenmask: u32,
-	bluemask: u32,
-	reservedmask: u32,
+	red_mask: u32,
+	green_mask: u32,
+	blue_mask: u32,
+	reserved_mask: u32,
 }
 impl PixelBitmask {
 	pub fn new(red: u32, green: u32, blue: u32, reserved: u32) -> Self {
 		Self {
-			redmask: red,
-			greenmask: green,
-			bluemask: blue,
-			reservedmask: reserved,
+			red_mask: red,
+			green_mask: green,
+			blue_mask: blue,
+			reserved_mask: reserved,
 		}
 	}
 }

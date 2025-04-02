@@ -130,7 +130,7 @@ extern "efiapi" fn efi_main(image_handle: *mut (), system_table: *mut uefi::tabl
 
 	let graphics_ptr = unsafe { (*(*graphics).mode).framebuffer_base }.to_ptr();
 	let graphics_len = unsafe { (*(*graphics).mode).framebuffer_size } / size_of::<GraphicsPixel>();
-	let pix_per_scan = unsafe { (*(*(*graphics).mode).info).pixelsperscanline };
+	let pix_per_scan = unsafe { (*(*(*graphics).mode).info).pixels_per_scanline };
 	let screen = unsafe { core::slice::from_raw_parts_mut(graphics_ptr, graphics_len) };
 
 	let elf_header_ptr = unsafe { &*(kernel_file_ptr as *const ElfHeader) };
