@@ -1,0 +1,13 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "kernel"
+test = false
+bench = false
+
+[dependencies]
+uefi = { path = "../uefi" }
+arch = { path = "../arch" }
