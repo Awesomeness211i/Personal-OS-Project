@@ -1,4 +1,4 @@
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Clone, Copy, Default, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Char8(u8);
 impl TryFrom<Char8> for char {
@@ -32,7 +32,7 @@ impl PartialEq<char> for Char8 {
 	}
 }
 
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Clone, Copy, Default, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Char16(u16);
 impl TryFrom<Char16> for char {
