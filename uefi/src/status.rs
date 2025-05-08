@@ -1,6 +1,30 @@
 #[repr(C)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct Status(usize);
+
+// impl core::fmt::Display for Status {
+// 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+// 		match *self {
+// 			Self::SUCCESS => write!(f, "success"),
+// 			Self::UNKNOWN_GLYPH => write!(f, "unknown glyph"),
+// 			Self::DELETE_FAILURE => write!(f, "delete failure"),
+// 			_ => write!(f, "unknown"),
+// 		}
+// 	}
+// }
+
+impl core::fmt::LowerHex for Status {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		core::fmt::LowerHex::fmt(&self.0, f)
+	}
+}
+
+impl core::fmt::UpperHex for Status {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		core::fmt::UpperHex::fmt(&self.0, f)
+	}
+}
+
 impl Status {
 	pub fn into_result<T>(self, result: T) -> Result<T, Self> {
 		match self {

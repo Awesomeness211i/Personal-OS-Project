@@ -3,53 +3,6 @@
 #![no_main]
 #![no_std]
 
-#[repr(C)]
-pub struct ElfHeader {
-	e_ident: [u8; 16],
-	e_type: u16,
-	e_machine: u16,
-	e_version: u32,
-	e_entry: usize,
-	e_phoff: usize,
-	e_shoff: usize,
-	e_flags: u32,
-	e_ehsize: u16,
-	e_phentsize: u16,
-	e_phnum: u16,
-	e_shentsize: u16,
-	e_shnum: u16,
-	e_shstrndx: u16,
-}
-
-#[repr(C)]
-pub struct ElfProgramHeader {
-	p_type: u32,
-	#[cfg(target_arch = "x86_64")]
-	p_flags: u32,
-	p_offset: usize,
-	p_vaddr: usize,
-	p_paddr: usize,
-	p_filesz: usize,
-	p_memsz: usize,
-	#[cfg(target_arch = "x86")]
-	p_flags: u32,
-	p_align: usize,
-}
-
-#[repr(C)]
-pub struct ElfSectionHeader {
-	sh_name: u32,
-	sh_type: u32,
-	sh_flags: usize,
-	sh_addr: usize,
-	sh_offset: usize,
-	sh_size: usize,
-	sh_link: u32,
-	sh_info: u32,
-	sh_addralign: usize,
-	sh_entsize: usize,
-}
-
 use uefi::protocols::{
 	Protocol,
 	// path::DevicePathProtocol,
@@ -65,6 +18,13 @@ use uefi::protocols::{
 		GraphicsPixel,
 		PixelBitmask,
 	}
+};
+
+use bootloader::elf::{
+	ElfHeader,
+	ExecutableType,
+	ElfProgramHeader,
+	ElfSectionHeader,
 };
 
 use core::{
@@ -108,6 +68,7 @@ extern "efiapi" fn efi_main(image_handle: *mut (), system_table: *mut uefi::tabl
 	let kernel_file = {
 		let mut file_protocol = core::ptr::null();
 		let _result = unsafe { ((*root_filesystem).open)(root_filesystem, &mut file_protocol, filename.as_ptr(), FileProtocol::MODE_READ, 0) };
+		let _status = unsafe { ((*root_filesystem).close)(root_filesystem) };
 		file_protocol
 	};
 	let file_size = {
@@ -134,13 +95,34 @@ extern "efiapi" fn efi_main(image_handle: *mut (), system_table: *mut uefi::tabl
 	let screen = unsafe { core::slice::from_raw_parts_mut(graphics_ptr, graphics_len) };
 
 	let elf_header_ptr = unsafe { &*(kernel_file_ptr as *const ElfHeader) };
-	if &elf_header_ptr.e_ident[0..4] != b"\x7FELF" {
-		return uefi::status::Status::INVALID_PARAMETER;
+	if &elf_header_ptr.identifier[0..4] != b"\x7FELF" /* magic */ {
+		return uefi::status::Status::ABORTED;
+	}
+	if elf_header_ptr.identifier[4] != 2 /* 64 bit */ {
+		return uefi::status::Status::ABORTED;
+	}
+	if elf_header_ptr.identifier[5] != 1 /* little endian */ {
+		return uefi::status::Status::ABORTED;
+	}
+	if elf_header_ptr.identifier[6] != 1 /* elf version */ {
+		return uefi::status::Status::ABORTED;
+	}
+	if elf_header_ptr.identifier[7] != 0 /* system v */ {
+		return uefi::status::Status::ABORTED;
+	}
+	if elf_header_ptr.identifier[8] != 0 /* abi version */ {
+		return uefi::status::Status::ABORTED;
+	}
+	if &elf_header_ptr.identifier[9..] != b"\x00\x00\x00\x00\x00\x00\x00" /* padding */ {
+		return uefi::status::Status::ABORTED;
+	}
+	if elf_header_ptr.executable_type != ExecutableType::DYNAMIC {
+		return uefi::status::Status::ABORTED;
 	}
 
-	let ph_table = unsafe { core::slice::from_raw_parts(kernel_file_ptr.add(elf_header_ptr.e_phoff) as *const ElfProgramHeader, elf_header_ptr.e_phnum as usize) };
+	let ph_table = unsafe { core::slice::from_raw_parts(kernel_file_ptr.add(elf_header_ptr.phoff) as *const ElfProgramHeader, elf_header_ptr.phnum as usize) };
 	for ph in ph_table {
-		if ph.p_type != 1 {
+		if ph.p_type != 1 /* PT_LOAD */ {
 			continue;
 		}
 	}
@@ -196,10 +178,10 @@ extern "efiapi" fn efi_main(image_handle: *mut (), system_table: *mut uefi::tabl
 			// loop {}
 		},
 		_ => {
+			let _x = unsafe { ((*(*system_table).boot_services).free_pool)(kernel_file_ptr as *mut ()) };
 			let _y = unsafe { ((*(*system_table).boot_services).free_pool)(memory_map as *mut ()) };
 			unsafe { ((*kernel_file).close)(kernel_file) };
-			// rootfs.close()?;
-			uefi::status::Status::NOT_STARTED
+			uefi::status::Status::ABORTED
 		},
 	}
 }

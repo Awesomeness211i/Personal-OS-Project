@@ -32,7 +32,6 @@ pub use strings::{
 	CStr8,
 	CStr16,
 };
-type Void = ();
 
 /// Type just to interpret C like boolean this is needed only because hardware vendors tend to use
 /// C like conventions for implementing booleans despite the standard saying booleans should only
@@ -43,16 +42,18 @@ pub enum Bool {
 	False,
 	True(core::num::NonZeroU8),
 }
-impl Bool {
-	pub const fn new(bool: bool) -> Self {
+impl From<bool> for Bool {
+	fn from(value: bool) -> Self {
 		// SAFETY:
 		// This shouldn't cause any undefined behavior because bool is a byte long and the enum
 		// should take care of the interpretation of the data inside of the bool if it is 0 then it
 		// is False because True contains a NonZeroU8
-		unsafe { core::mem::transmute(bool) }
+		unsafe { core::mem::transmute(value) }
 	}
-	pub const fn to_bool(&self) -> bool {
-		match self {
+}
+impl From<Bool> for bool {
+	fn from(value: Bool) -> Self {
+		match value {
 			Bool::True(_) => true,
 			Bool::False => false,
 		}

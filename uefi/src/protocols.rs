@@ -1,5 +1,4 @@
 use crate::{
-	Void,
 	GUID,
 	status::Status,
 };
@@ -20,10 +19,10 @@ pub trait Protocol {
 
 #[repr(C)]
 pub struct DecompressProtocol {
-	/// self: IN, source: IN, sourcesize: IN, destinationsize: OUT, scratchsize: OUT
-	pub get_info: unsafe extern "efiapi" fn(*const Self, source: *const Void, sourcesize: u32, destinationsize: *mut u32, scratchsize: *mut u32) -> Status,
-	/// self: IN, source: IN, sourcesize: IN, destination: IN OUT, destinationsize: IN, scratch: IN OUT, scratchsize: IN
-	pub decompress: unsafe extern "efiapi" fn(*const Self,  source: *const Void, sourcesize: u32, destination: *mut Void, destinationsize: u32, scratch: *mut Void, scratchsize: u32) -> Status,
+	/// this: IN, source: IN, sourcesize: IN, destinationsize: OUT, scratchsize: OUT
+	pub get_info: unsafe extern "efiapi" fn(this: *const Self, source: *const (), sourcesize: u32, destinationsize: *mut u32, scratchsize: *mut u32) -> Status,
+	/// this: IN, source: IN, sourcesize: IN, destination: IN OUT, destinationsize: IN, scratch: IN OUT, scratchsize: IN
+	pub decompress: unsafe extern "efiapi" fn(this: *const Self,  source: *const (), sourcesize: u32, destination: *mut (), destinationsize: u32, scratch: *mut (), scratchsize: u32) -> Status,
 }
 impl Protocol for DecompressProtocol {
 	/// GUID: D8117CFE-94A6-11D4-9A3A-0090273FC14D
@@ -34,7 +33,7 @@ impl Protocol for DecompressProtocol {
 pub struct BootManagerPolicyProtocol {
 	pub revision: u64,
 	/// this: IN, devicepath: IN, recursive: IN
-	pub connectdevicepath: unsafe extern "efiapi" fn(this: *const Self, devicepath: *const Void, recursive: bool) -> Status,
+	pub connectdevicepath: unsafe extern "efiapi" fn(this: *const Self, devicepath: *const (), recursive: bool) -> Status,
 	/// this: IN, class: IN
 	pub connectdeviceclass: unsafe extern "efiapi" fn(this: *const Self, class: *const GUID) -> Status,
 }

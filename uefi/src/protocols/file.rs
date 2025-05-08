@@ -1,13 +1,24 @@
 use crate::{
-	Void,
 	GUID,
 	Event,
 	CStr16,
 	Char16,
 	tables::Time,
 	status::Status,
-	protocols::Protocol,
+	protocols::{
+		Protocol,
+		path::DevicePathProtocol
+	},
 };
+
+#[repr(C)]
+pub struct LoadFileProtocol {
+	/// this: IN, file_path: IN, boot_policy: IN, buffer_size: IN OUT, buffer: IN
+	pub load_file: unsafe extern "efiapi" fn(this: *const Self, file_path: *const DevicePathProtocol, boot_policy: bool, buffer_size: *mut usize, buffer: Option<core::ptr::NonNull<()>>) -> Status,
+}
+impl Protocol for LoadFileProtocol {
+	const GUID: GUID = GUID::new(0x56EC3091, 0x954C, 0x11D2, 0x8E3F_00A0C969723B);
+}
 
 #[repr(C)]
 pub struct SimpleFileSystemProtocol {
@@ -67,7 +78,7 @@ pub struct FileIOToken {
 	pub event: Event,
 	pub status: Status,
 	pub buffersize: usize,
-	pub buffer: *const Void,
+	pub buffer: *const (),
 }
 
 #[repr(C)]

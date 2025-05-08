@@ -1,5 +1,4 @@
 use crate::{
-	Void,
 	GUID,
 	status::Status,
 	tables::SystemTable,
@@ -21,7 +20,7 @@ pub struct LoadedImageProtocol {
 	image_code_type: MemoryType,
 	image_data_type: MemoryType,
 	/// handle: IN
-	unload: Option<unsafe extern "efiapi" fn(handle: &Void) -> Status>,
+	unload: unsafe extern "efiapi" fn(handle: *const ()) -> Status,
 }
 impl super::Protocol for LoadedImageProtocol {
 	/// GUID: 5B1B31A1-9562-11D2-8E3F-00A0C969723B
@@ -30,7 +29,7 @@ impl super::Protocol for LoadedImageProtocol {
 
 /// Not sure if this should exist yet
 #[repr(C)]
-pub struct LoadedImageDevicePathProtocol(pub super::path::PathType);
+pub struct LoadedImageDevicePathProtocol(pub super::path::DevicePathProtocol);
 impl super::Protocol for LoadedImageDevicePathProtocol {
 	/// GUID: BC62157E-3E33-4FEC-9920-2D3B36D750DF
 	const GUID: GUID = GUID::new(0xBC62157E, 0x3E33, 0x4FEC, 0x9920_2D3B36D750DF);

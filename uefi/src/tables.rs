@@ -1,7 +1,6 @@
 use super::{
 	Bool,
 	GUID,
-	Void,
 	Char16,
 	services,
 	protocols::text,
@@ -35,7 +34,7 @@ pub struct TableHeader {
 #[repr(C)]
 pub struct ConfigurationTable {
 	vendorguid: GUID,
-	vendortable: *const Void,
+	vendortable: *const (),
 }
 impl ConfigurationTable {
 	/// GUID: 8868E871-E4F1-11D3-BC22-0080C73C8881

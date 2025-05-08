@@ -1,6 +1,5 @@
 use crate::{
 	Bool,
-	Void,
 	GUID,
 	Event,
 	Char16,
@@ -82,11 +81,11 @@ pub struct BootServices {
 	/// memorymapsize: IN OUT, memorymap: OUT, mapkey: OUT, descriptorsize: OUT, descriptorversion: OUT
 	pub get_memory_map: unsafe extern "efiapi" fn(memorymapsize: *mut usize, memorymap: *mut MemoryDescriptor, mapkey: *mut usize, descriptorsize: *mut usize, descriptorversion: *mut u32) -> Status,
 	/// pooltype: IN, size: IN, buffer: OUT
-	pub allocate_pool: unsafe extern "efiapi" fn(pooltype: MemoryType, size: usize, buffer: *mut *mut Void) -> Status,
+	pub allocate_pool: unsafe extern "efiapi" fn(pooltype: MemoryType, size: usize, buffer: *mut *mut ()) -> Status,
 	/// buffer: IN
-	pub free_pool: unsafe extern "efiapi" fn(buffer: *const Void) -> Status,
+	pub free_pool: unsafe extern "efiapi" fn(buffer: *const ()) -> Status,
 	/// eventtype: IN, notifytpl: IN, notifyfunction: IN, notifycontext: IN, event: OUT
-	pub create_event: unsafe extern "efiapi" fn(eventtype: u32, notifytpl: TaskPriorityLevel, notifyfunction: Option<extern "efiapi" fn(event: Event, context: *mut Void)>, notifycontext: *mut Void, event: *mut Event) -> Status,
+	pub create_event: unsafe extern "efiapi" fn(eventtype: u32, notifytpl: TaskPriorityLevel, notifyfunction: Option<extern "efiapi" fn(event: Event, context: *mut ())>, notifycontext: *mut (), event: *mut Event) -> Status,
 	/// event: IN, triggertimetype: IN, triggertime: IN
 	pub set_timer: unsafe extern "efiapi" fn(event: Event, triggertimetype: TimerDelay, triggertime: u64) -> Status,
 	/// numevents: IN, event: IN, index: OUT
@@ -98,33 +97,33 @@ pub struct BootServices {
 	/// event: IN
 	pub check_event: unsafe extern "efiapi" fn(event: Event) -> Status,
 	/// handle: IN OUT, protocol: IN, interfacetype: IN, interface: IN
-	pub install_protocol_interface: unsafe extern "efiapi" fn(handle: *mut *mut Void, protocol: *const GUID, interfacetype: InterfaceType, interface: *mut Void) -> Status,
+	pub install_protocol_interface: unsafe extern "efiapi" fn(handle: *mut *mut (), protocol: *const GUID, interfacetype: InterfaceType, interface: *mut ()) -> Status,
 	/// handle: IN, protocol: IN, oldinterface: IN, newinterface: IN
-	pub reinstall_protocol_interface: unsafe extern "efiapi" fn(handle: *mut Void, protocol: *const GUID, oldinterface: *mut Void, newinterface: *mut Void) -> Status,
+	pub reinstall_protocol_interface: unsafe extern "efiapi" fn(handle: *mut (), protocol: *const GUID, oldinterface: *mut (), newinterface: *mut ()) -> Status,
 	/// handle: IN, protocol: IN, interface: IN
-	pub uninstall_protocol_interface: unsafe extern "efiapi" fn(handle: *mut Void, protocol: *const GUID, interface: *mut Void) -> Status,
+	pub uninstall_protocol_interface: unsafe extern "efiapi" fn(handle: *mut (), protocol: *const GUID, interface: *mut ()) -> Status,
 	/// handle: IN, protocol: IN, interface: OUT
-	pub handle_protocol: unsafe extern "efiapi" fn(handle: *mut Void, protocol: *const GUID, interface: *mut *const Void) -> Status,
+	pub handle_protocol: unsafe extern "efiapi" fn(handle: *mut (), protocol: *const GUID, interface: *mut *const ()) -> Status,
 	/// unused
 	reserved: unsafe extern "efiapi" fn() -> Status,
 	/// protocol: IN, event: IN, registration: OUT,
-	pub register_protocol_notify: unsafe extern "efiapi" fn(protocol: *const GUID, event: Event, registration: *mut *mut Void) -> Status,
+	pub register_protocol_notify: unsafe extern "efiapi" fn(protocol: *const GUID, event: Event, registration: *mut *mut ()) -> Status,
 	/// searchtype: IN, protocol: IN, searchkey: IN, buffersize: IN OUT, buffer: OUT
-	pub locate_handle: unsafe extern "efiapi" fn(searchtype: LocateSearchType, protocol: *const GUID, searchkey: *mut Void, buffersize: *mut usize, buffer: *mut *mut Void) -> Status,
+	pub locate_handle: unsafe extern "efiapi" fn(searchtype: LocateSearchType, protocol: *const GUID, searchkey: *mut (), buffersize: *mut usize, buffer: *mut *mut ()) -> Status,
 	/// protocol: IN, devicepath: IN OUT, device: OUT
-	pub locate_device_path: unsafe extern "efiapi" fn(protocol: *const GUID, devicepath: *mut *const DevicePathProtocol, device: *mut *mut Void) -> Status,
+	pub locate_device_path: unsafe extern "efiapi" fn(protocol: *const GUID, devicepath: *mut *const DevicePathProtocol, device: *mut *mut ()) -> Status,
 	/// guid: IN, table: IN
-	pub install_configuration_table: unsafe extern "efiapi" fn(guid: *const GUID, table: *mut Void) -> Status,
+	pub install_configuration_table: unsafe extern "efiapi" fn(guid: *const GUID, table: *mut ()) -> Status,
 	/// bootpolicy: IN, parentimagehandle: IN, devicepath: IN, sourcebuffer: IN, sourcesize: IN, imagehandle: OUT
-	pub load_image: unsafe extern "efiapi" fn(bootpolicy: bool, parentimagehandle: *mut Void, devicepath: *const DevicePathProtocol, sourcebuffer: *mut Void, sourcesize: usize, imagehandle: *mut *mut Void) -> Status,
+	pub load_image: unsafe extern "efiapi" fn(bootpolicy: bool, parentimagehandle: *mut (), devicepath: *const DevicePathProtocol, sourcebuffer: *mut (), sourcesize: usize, imagehandle: *mut *mut ()) -> Status,
 	/// imagehandle: IN, exitdatasize: OUT, exitdata: OUT
-	pub start_image: unsafe extern "efiapi" fn(imagehandle: *mut Void, exitdatasize: *mut usize, exitdata: *mut *const Char16) -> Status,
+	pub start_image: unsafe extern "efiapi" fn(imagehandle: *mut (), exitdatasize: *mut usize, exitdata: *mut *const Char16) -> Status,
 	/// imagehandle: IN, exitstatus: IN, exitdatasize: IN, exitdata: IN
-	pub exit: unsafe extern "efiapi" fn(imagehandle: *mut Void, exitstatus: Status, exitdatasize: usize, exitdata: *const Char16) -> Status,
+	pub exit: unsafe extern "efiapi" fn(imagehandle: *mut (), exitstatus: Status, exitdatasize: usize, exitdata: *const Char16) -> Status,
 	/// imagehandle: IN
-	pub unload_image: unsafe extern "efiapi" fn(imagehandle: *mut Void) -> Status,
+	pub unload_image: unsafe extern "efiapi" fn(imagehandle: *mut ()) -> Status,
 	/// imagehandle: IN, mapkey: IN
-	pub exit_boot_services: unsafe extern "efiapi" fn(imagehandle: *mut Void, mapkey: usize) -> Status,
+	pub exit_boot_services: unsafe extern "efiapi" fn(imagehandle: *mut (), mapkey: usize) -> Status,
 	/// count: OUT
 	pub get_next_monotonic_count: unsafe extern "efiapi" fn(count: *mut u64) -> Status,
 	/// microseconds: IN
@@ -132,33 +131,33 @@ pub struct BootServices {
 	/// timeout: IN, watchdogcode: IN, datasize: IN, watchdogdata: IN
 	pub set_watchdog_timer: unsafe extern "efiapi" fn(timeout: usize, watchdogcode: u64, datasize: usize, watchdogdata: Option<&Char16>) -> Status, // EFI 1.0
 	/// controllerhandle: IN, driverimagehandle: IN, remainingdevicepath: IN, recursive: IN
-	pub connect_controller: unsafe extern "efiapi" fn(controllerhandle: *mut Void, driverimagehandle: *mut Void, remainingdevicepath: *const DevicePathProtocol, recursive: bool) -> Status,
+	pub connect_controller: unsafe extern "efiapi" fn(controllerhandle: *mut (), driverimagehandle: *mut (), remainingdevicepath: *const DevicePathProtocol, recursive: bool) -> Status,
 	/// controllerhandle: IN, driverimagehandle: IN, childhandle: IN
-	pub disconnect_controller: unsafe extern "efiapi" fn(controllerhandle: *mut Void, driverimagehandle: *mut Void, childhandle: *mut Void) -> Status,
+	pub disconnect_controller: unsafe extern "efiapi" fn(controllerhandle: *mut (), driverimagehandle: *mut (), childhandle: *mut ()) -> Status,
 	/// handle: IN, protocol: IN, interface: OUT, agenthandle: IN, controllerhandle: IN, attributes: IN
-	pub open_protocol: unsafe extern "efiapi" fn(handle: *const Void, protocol: &GUID, interface: *mut *const Void, agenthandle: *mut Void, controllerhandle: *mut Void, attributes: u32) -> Status,
+	pub open_protocol: unsafe extern "efiapi" fn(handle: *const (), protocol: &GUID, interface: *mut *const (), agenthandle: *mut (), controllerhandle: *mut (), attributes: u32) -> Status,
 	/// handle: IN, protocol: IN, agenthandle: IN, controllerhandle: IN
-	pub close_protocol: unsafe extern "efiapi" fn(handle: *const Void, protocol: &GUID, agenthandle: *mut Void, controllerhandle: *mut Void) -> Status,
+	pub close_protocol: unsafe extern "efiapi" fn(handle: *const (), protocol: &GUID, agenthandle: *mut (), controllerhandle: *mut ()) -> Status,
 	/// handle: IN, protocol: IN, entrybuffer: OUT, entrycount: OUT
-	pub open_protocol_information: unsafe extern "efiapi" fn(handle: *mut Void, protocol: &GUID, entrybuffer: *mut *const OpenProtocolInformationEntry, entrycount: *mut usize) -> Status,
+	pub open_protocol_information: unsafe extern "efiapi" fn(handle: *mut (), protocol: &GUID, entrybuffer: *mut *const OpenProtocolInformationEntry, entrycount: *mut usize) -> Status,
 	/// handle: IN, protocolbuffer: OUT, protocolBuffercount: OUT
-	pub protocols_per_handle: unsafe extern "efiapi" fn(handle: *mut Void, protocolbuffer: *mut *const *const GUID, protocolbuffercount: *mut usize) -> Status,
+	pub protocols_per_handle: unsafe extern "efiapi" fn(handle: *mut (), protocolbuffer: *mut *const *const GUID, protocolbuffercount: *mut usize) -> Status,
 	/// searchtype: IN, protocol: IN, searchkey: IN, numhandles: OUT, buffer: OUT
-	pub locate_handle_buffer: unsafe extern "efiapi" fn(searchtype: LocateSearchType, protocol: *const GUID, searchkey: *mut Void, numhandles: *mut usize, buffer: *mut *const *mut Void) -> Status,
+	pub locate_handle_buffer: unsafe extern "efiapi" fn(searchtype: LocateSearchType, protocol: *const GUID, searchkey: *mut (), numhandles: *mut usize, buffer: *mut *const *mut ()) -> Status,
 	/// protocol: IN, registration: IN, interface: OUT
-	pub locate_protocol: unsafe extern "efiapi" fn(protocol: *const GUID, registration: *mut Void, interface: *mut *const Void) -> Status,
+	pub locate_protocol: unsafe extern "efiapi" fn(protocol: *const GUID, registration: *mut (), interface: *mut *const ()) -> Status,
 	/// handle: IN OUT, ...: pairs of protocol GUID and protocol interface
-	pub install_multiple_protocol_interfaces: unsafe extern "efiapi" fn(handle: *mut *mut Void, ...),
+	pub install_multiple_protocol_interfaces: unsafe extern "efiapi" fn(handle: *mut *mut (), ...),
 	/// handle: IN, ...: pairs of protocol GUID and protocol interface
-	pub uninstall_multiple_protocol_interfaces: unsafe extern "efiapi" fn(handle: *mut Void, ...),
+	pub uninstall_multiple_protocol_interfaces: unsafe extern "efiapi" fn(handle: *mut (), ...),
 	/// data: IN, datasize: IN, crc32: OUT
-	pub calculate_crc32: unsafe extern "efiapi" fn(data: *mut Void, datasize: usize, crc32: *mut u32) -> Status,
+	pub calculate_crc32: unsafe extern "efiapi" fn(data: *mut (), datasize: usize, crc32: *mut u32) -> Status,
 	/// destination: IN, source: IN, length: IN
-	pub copy_mem: unsafe extern "efiapi" fn(destination: *mut Void, source: *const Void, length: usize),
+	pub copy_mem: unsafe extern "efiapi" fn(destination: *mut (), source: *const (), length: usize),
 	/// buffer: IN, size: IN, value: IN
-	pub set_mem: unsafe extern "efiapi" fn(buffer: *mut Void, size: usize, value: u8), // EFI 1.1
+	pub set_mem: unsafe extern "efiapi" fn(buffer: *mut (), size: usize, value: u8), // EFI 1.1
 	/// eventtype: IN, notifytpl: IN, notifyfuntion: IN, notifycontext: IN CONST, eventgroup: IN CONST, event: OUT
-	pub create_event_ex: unsafe extern "efiapi" fn(eventtype: u32, notifytpl: TaskPriorityLevel, notifyfunction: Option<extern "efiapi" fn(event: Event, context: &Void)>, notifycontext: Option<&Void>, eventgroup: Option<&GUID>, event: &mut Event) -> Status, // EFI 2.0
+	pub create_event_ex: unsafe extern "efiapi" fn(eventtype: u32, notifytpl: TaskPriorityLevel, notifyfunction: Option<extern "efiapi" fn(event: Event, context: &())>, notifycontext: Option<&()>, eventgroup: Option<&GUID>, event: &mut Event) -> Status, // EFI 2.0
 }
 impl BootServices {
 	pub const SIGNATURE: u64 = 0x56524553544F4F42;
@@ -211,13 +210,14 @@ impl BootServices {
 		// SAFETY:
 		unsafe { (self.restore_tpl)(oldtpl) }
 	}
+
 	pub fn wait_for_event(&self, events: &[Event]) -> Result<usize, Status> {
 		let mut index = 0;
 		// SAFETY:
 		unsafe { (self.wait_for_event)(events.len(), events.as_ptr(), &mut index) }
 			.into_result(index)
 	}
-	// pub fn handle_protocol<T: Protocol>(&self, handle: *mut Void) -> Result<*mut Void<T>, Status> {
+	// pub fn handle_protocol<T: Protocol>(&self, handle: *mut ()) -> Result<*mut ()<T>, Status> {
 	// 	let mut interface = core::ptr::null();
 	// 	// SAFETY:
 	// 	// Should be safe because to call this we need a valid implementation of Protocol and even
@@ -226,27 +226,27 @@ impl BootServices {
 	// 	unsafe { (self.handle_protocol)(handle, &T::GUID, &mut interface) }
 	// 		// SAFETY:
 	// 		// Should be safe because we got back a valid interface from a valid protocol
-	// 		.map(|| unsafe { *mut Void::new_unchecked(interface as *mut T) })
+	// 		.map(|| unsafe { *mut ()::new_unchecked(interface as *mut T) })
 	// }
 	// pub fn stall(&self, microseconds: usize) -> Result<(), Status> {
 	// 	// SAFETY:
 	// 	unsafe { (self.stall)(microseconds) }.into_result(())
 	// }
-	// pub fn locate_protocol<T: Protocol>(&self, registration: Option<*mut Void>) -> Result<*mut Void<T>, Status> {
+	// pub fn locate_protocol<T: Protocol>(&self, registration: Option<*mut ()>) -> Result<*mut ()<T>, Status> {
 	// 	let mut interface = core::ptr::null();
 	// 	// SAFETY:
 	// 	unsafe { (self.locate_protocol)(&T::GUID, registration, &mut interface) }
 	// 		// SAFETY:
-	// 		.map(|| unsafe { *mut Void::new_unchecked(interface as *mut T) })
+	// 		.map(|| unsafe { *mut ()::new_unchecked(interface as *mut T) })
 	// }
-	// pub fn open_protocol<T: Protocol>(&self, handle: &*mut Void, agenthandle: *mut Void, controllerhandle: *mut Void, attributes: u32) -> Result<*mut Void<T>, Status> {
+	// pub fn open_protocol<T: Protocol>(&self, handle: &*mut (), agenthandle: *mut (), controllerhandle: *mut (), attributes: u32) -> Result<*mut ()<T>, Status> {
 	// 	let mut interface = core::ptr::null();
 	// 	// SAFETY:
 	// 	unsafe { (self.open_protocol)(handle.as_ptr(), &T::GUID, Some(&mut interface), agenthandle, controllerhandle, attributes) }
 	// 		// SAFETY:
-	// 		.map(|| unsafe { *mut Void::new_unchecked(interface as *mut T) })
+	// 		.map(|| unsafe { *mut ()::new_unchecked(interface as *mut T) })
 	// }
-	// pub fn close_protocol<T: Protocol>(&self, handle: &*mut Void, agenthandle: *mut Void, controllerhandle: *mut Void) -> Result<(), Status> {
+	// pub fn close_protocol<T: Protocol>(&self, handle: &*mut (), agenthandle: *mut (), controllerhandle: *mut ()) -> Result<(), Status> {
 	// 	// SAFETY:
 	// 	unsafe { (self.close_protocol)(handle.as_ptr(), &T::GUID, agenthandle, controllerhandle) }
 	// 		.into_result(())
@@ -285,17 +285,17 @@ pub struct RuntimeServices {
 	/// memorymapsize: IN, descriptorsize: IN, descriptorversion: IN, virtualmap: IN
 	pub set_virtual_address_map: unsafe extern "efiapi" fn(memorymapsize: usize, descriptorsize: usize, descriptorversion: u32, virtualmap: *const MemoryDescriptor) -> Status,
 	/// debugdispostition: IN, address: IN
-	pub convert_pointer: unsafe extern "efiapi" fn(debugdispostition: usize, address: *mut *const Void) -> Status,
+	pub convert_pointer: unsafe extern "efiapi" fn(debugdispostition: usize, address: *mut *const ()) -> Status,
 	/// variablename: IN, vendorguid: IN, attributes: OUT, datasize: IN OUT, data: OUT
-	pub get_variable: unsafe extern "efiapi" fn(variablename: *const Char16, vendorguid: *const GUID, attributes: *mut u32, datasize: *mut usize, data: *mut Void) -> Status,
+	pub get_variable: unsafe extern "efiapi" fn(variablename: *const Char16, vendorguid: *const GUID, attributes: *mut u32, datasize: *mut usize, data: *mut ()) -> Status,
 	/// variablenamesize: IN OUT, variablename: IN OUT, vendorguid: IN OUT
 	pub get_next_variable_name: unsafe extern "efiapi" fn(variablenamesize: *mut usize, variablename: *mut Char16, vendorguid: *mut GUID) -> Status,
 	/// variablename: IN, vendorguid: IN, attributes: IN, datasize: IN, data: IN
-	pub set_variable: unsafe extern "efiapi" fn(variablename: *const Char16, vendorguid: *const GUID, attributes: u32, datasize: usize, data: *const Void) -> Status,
+	pub set_variable: unsafe extern "efiapi" fn(variablename: *const Char16, vendorguid: *const GUID, attributes: u32, datasize: usize, data: *const ()) -> Status,
 	/// highcount: OUT
 	pub get_next_high_monotonic_count: unsafe extern "efiapi" fn(highcount: *mut u32) -> Status,
 	/// resettype: IN, resetstatus: IN, datasize: IN, resetdata: IN
-	pub reset_system: unsafe extern "efiapi" fn(resettype: ResetType, resetstatus: Status, datasize: usize, resetdata: *const Void) -> !,
+	pub reset_system: unsafe extern "efiapi" fn(resettype: ResetType, resetstatus: Status, datasize: usize, resetdata: *const ()) -> !,
 	/// capsuleheaderarray: IN, capsulecount: IN, scattergatherlist: IN
 	pub update_capsule: unsafe extern "efiapi" fn(capsuleheaderarray: *const *const CapsuleHeader, capsulecount: usize, scattergatherlist: PhysicalAddress) -> Status,
 	/// capsuleheaderarray: IN, capsulecount: IN, maximumcapsulesize: OUT, resettype: OUT

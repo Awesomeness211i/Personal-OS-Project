@@ -1,5 +1,4 @@
 use crate::{
-	Void,
 	GUID,
 	status::Status,
 };
@@ -134,19 +133,19 @@ pub struct SystemContextIa32 {
 }
 
 /// exceptiontype: IN, systemcontext: IN OUT
-type ExceptionCallback = extern "efiapi" fn(exceptiontype: isize, systemcontext: *const Void) -> Status;
+type ExceptionCallback = extern "efiapi" fn(exceptiontype: isize, systemcontext: *const ()) -> Status;
 
 #[repr(C)]
 pub struct DebugSupportProtocol {
 	isa: InstructionSetArchitecture,
 	/// this: IN, maxprocessorindex: OUT
-	getmaximumprocessorindex: unsafe extern "efiapi" fn(this: &Self, maxprocessorindex: &mut usize) -> Status,
+	getmaximumprocessorindex: unsafe extern "efiapi" fn(this: *const Self, maxprocessorindex: *mut usize) -> Status,
 	/// this: IN, processorindex: IN, periodiccallback: IN OUT
-	registerperiodiccallback: unsafe extern "efiapi" fn(this: &Self, processorindex: usize, periodiccallback: *const Void) -> Status,
+	registerperiodiccallback: unsafe extern "efiapi" fn(this: *const Self, processorindex: usize, periodiccallback: *const ()) -> Status,
 	/// this: IN, processorindex: IN, exceptioncallback: IN, exceptiontype: IN
-	registerexceptioncallback: unsafe extern "efiapi" fn(this: &Self, processorindex: usize, exceptioncallback: ExceptionCallback, exceptiontype: isize) -> Status,
+	registerexceptioncallback: unsafe extern "efiapi" fn(this: *const Self, processorindex: usize, exceptioncallback: ExceptionCallback, exceptiontype: isize) -> Status,
 	/// this: IN, processorindex: IN, start: IN, length: IN
-	invalidateinstructioncache: unsafe extern "efiapi" fn(this: &Self, processorindex: usize, start: *const Void, length: u64) -> Status,
+	invalidateinstructioncache: unsafe extern "efiapi" fn(this: *const Self, processorindex: usize, start: *const (), length: u64) -> Status,
 }
 impl super::Protocol for DebugSupportProtocol {
 	const GUID: GUID = GUID::new(0x2755590C, 0x6F3C, 0x42FA, 0x9EA4_A3BA543CDA25);
@@ -155,13 +154,13 @@ impl super::Protocol for DebugSupportProtocol {
 #[repr(C)]
 pub struct DebugPortProtocol {
 	/// this: IN
-	reset: unsafe extern "efiapi" fn(this: &Self),
+	reset: unsafe extern "efiapi" fn(this: *const Self),
 	/// this: IN, timeout: IN, buffersize: IN OUT, buffer: IN
-	write: unsafe extern "efiapi" fn(this: &Self, timeout: u32, buffersize: &mut usize, buffer: *const Void),
+	write: unsafe extern "efiapi" fn(this: *const Self, timeout: u32, buffersize: *mut usize, buffer: *const ()),
 	/// this: IN, timeout: IN, buffersize: IN OUT, buffer: OUT
-	read: unsafe extern "efiapi" fn(this: &Self, timeout: u32, buffersize: &mut usize, buffer: *mut Void),
+	read: unsafe extern "efiapi" fn(this: *const Self, timeout: u32, buffersize: *mut usize, buffer: *mut ()),
 	/// this: IN
-	poll: unsafe extern "efiapi" fn(this: &Self),
+	poll: unsafe extern "efiapi" fn(this: *const Self),
 }
 impl super::Protocol for DebugPortProtocol {
 	const GUID: GUID = GUID::new(0xEBA4E8D2, 0x3858, 0x41EC, 0xA281_2647BA9660D0);
@@ -285,11 +284,11 @@ pub enum InstructionSetArchitecture {
 // 	ebc: *const SystemContextEBC,
 // 	ia32: *const SystemContextIa32,
 // 	x64: *const SystemContextX64,
-// 	ipf: *const Void,
-// 	arm: *const Void,
-// 	aarch64: *const Void,
+// 	ipf: *const (),
+// 	arm: *const (),
+// 	aarch64: *const (),
 // 	riscv32: *const SystemContextRiscV<u32>,
 // 	riscv64: *const SystemContextRiscV<u64>,
 // 	riscv128: *const SystemContextRiscV<u128>,
-// 	loongarch64: *const Void,
+// 	loongarch64: *const (),
 // }
