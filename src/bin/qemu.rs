@@ -7,7 +7,7 @@ fn main() -> Result<(), std::io::Error> {
 	// create uefi and partition image
 	let _dd1 = std::process::Command::new("dd")
 		.arg("if=/dev/zero")
-		.arg(format!("of={}", uefi_path))
+		.arg(format!("of={uefi_path}"))
 		.arg(format!("bs={}", 1024)) // block size in bytes
 		.arg(format!("count={}", 46875)) // in block size
 		.status()?;
@@ -72,7 +72,7 @@ fn main() -> Result<(), std::io::Error> {
 		.status()?;
 	let _dd3 = std::process::Command::new("dd")
 		.arg(format!("if={}", partition_image.display())) // input file
-		.arg(format!("of={}", uefi_path)) // output file
+		.arg(format!("of={uefi_path}")) // output file
 		.arg(format!("bs={}", 512)) // in bytes
 		.arg(format!("count={}", 91669)) // in block size
 		.arg(format!("seek={}", 2048))
@@ -87,7 +87,7 @@ fn main() -> Result<(), std::io::Error> {
 		.arg(format!("if=pflash,format=raw,unit=1,file={}", std::env::current_dir().unwrap().join("firmware/x64/vars.fd").display()))
 		.arg("-net").arg("none")
 		.arg("-drive")
-		.arg(format!("format=raw,file={}", uefi_path))
+		.arg(format!("format=raw,file={uefi_path}"))
 		.status()?;
 	#[cfg(target_arch = "aarch64")]
 	let exit_status = std::process::Command::new("qemu-system-arm")
