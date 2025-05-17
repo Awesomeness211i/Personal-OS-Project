@@ -1,7 +1,7 @@
 use crate::{
 	Bool,
-	Event,
 	Char16,
+	Event,
 	status::Status,
 };
 
@@ -51,7 +51,9 @@ pub enum BackgroundColor {
 
 impl SimpleTextOutputProtocol {
 	/// Stand in for the macro EFI_TEXT_ATTR(Foreground,Background)
-	pub const fn textattribute(foreground: Color, background: BackgroundColor) -> usize { (foreground as usize) | ((background as usize) << 4) }
+	pub const fn textattribute(foreground: Color, background: BackgroundColor) -> usize {
+		(foreground as usize) | ((background as usize) << 4)
+	}
 }
 
 #[repr(C)]
@@ -67,7 +69,7 @@ pub struct SimpleTextOutputMode {
 #[repr(C)]
 pub struct SimpleTextInputExProtocol {
 	// this: IN, extendedverification: IN
-	pub reset_ex: unsafe extern "efiapi" fn(this: *const Self, extendedVerification: bool) -> Status,
+	pub reset_ex: unsafe extern "efiapi" fn(this: *const Self, extended_verification: bool) -> Status,
 	// this: IN, key: OUT
 	pub read_keystroke_ex: unsafe extern "efiapi" fn(this: *const Self, key: *mut InputKey) -> Status,
 	// waitforevent
@@ -83,7 +85,7 @@ pub struct SimpleTextInputExProtocol {
 #[repr(C)]
 pub struct SimpleTextInputProtocol {
 	// this: IN, extendedverification: IN
-	pub reset: unsafe extern "efiapi" fn(this: *const Self, extendedVerification: bool) -> Status,
+	pub reset: unsafe extern "efiapi" fn(this: *const Self, extended_verification: bool) -> Status,
 	// this: IN, extendedverification: OUT
 	pub read_keystroke: unsafe extern "efiapi" fn(this: *const Self, key: *mut InputKey) -> Status,
 	// waitforevent

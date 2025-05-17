@@ -1,6 +1,6 @@
 use super::{
-	VirtualAddress,
 	PhysicalAddress,
+	VirtualAddress,
 };
 
 #[repr(transparent)]
@@ -88,7 +88,9 @@ impl MemoryType {
 		assert!(result.get() >= Self::OS_RESERVED.start().get());
 		result
 	}
-	pub const fn get(&self) -> u32 { self.0 }
+	pub const fn get(&self) -> u32 {
+		self.0
+	}
 }
 
 /// Can't rely on the static size of this type, you need to query for the descriptor size

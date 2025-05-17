@@ -1,23 +1,23 @@
 use crate::{
 	Bool,
-	GUID,
-	Event,
 	Char16,
+	Event,
+	GUID,
 	PhysicalAddress,
 
-	status::Status,
-	protocols::{
-		// Protocol,
-		path::DevicePathProtocol,
-	},
 	memory::{
 		MemoryDescriptor,
 		MemoryType,
 	},
+	protocols::{
+		// Protocol,
+		path::DevicePathProtocol,
+	},
+	status::Status,
 	tables::{
-		Time,
-		TableHeader,
 		CapsuleHeader,
+		TableHeader,
+		Time,
 		TimeCapabilities,
 	},
 };
@@ -81,11 +81,18 @@ pub struct BootServices {
 	/// memorymapsize: IN OUT, memorymap: OUT, mapkey: OUT, descriptorsize: OUT, descriptorversion: OUT
 	pub get_memory_map: unsafe extern "efiapi" fn(memorymapsize: *mut usize, memorymap: *mut MemoryDescriptor, mapkey: *mut usize, descriptorsize: *mut usize, descriptorversion: *mut u32) -> Status,
 	/// pooltype: IN, size: IN, buffer: OUT
+	/// size in bytes
 	pub allocate_pool: unsafe extern "efiapi" fn(pooltype: MemoryType, size: usize, buffer: *mut *mut ()) -> Status,
 	/// buffer: IN
 	pub free_pool: unsafe extern "efiapi" fn(buffer: *const ()) -> Status,
 	/// eventtype: IN, notifytpl: IN, notifyfunction: IN, notifycontext: IN, event: OUT
-	pub create_event: unsafe extern "efiapi" fn(eventtype: u32, notifytpl: TaskPriorityLevel, notifyfunction: Option<extern "efiapi" fn(event: Event, context: *mut ())>, notifycontext: *mut (), event: *mut Event) -> Status,
+	pub create_event: unsafe extern "efiapi" fn(
+		eventtype: u32,
+		notifytpl: TaskPriorityLevel,
+		notifyfunction: Option<extern "efiapi" fn(event: Event, context: *mut ())>,
+		notifycontext: *mut (),
+		event: *mut Event,
+	) -> Status,
 	/// event: IN, triggertimetype: IN, triggertime: IN
 	pub set_timer: unsafe extern "efiapi" fn(event: Event, triggertimetype: TimerDelay, triggertime: u64) -> Status,
 	/// numevents: IN, event: IN, index: OUT
@@ -115,7 +122,8 @@ pub struct BootServices {
 	/// guid: IN, table: IN
 	pub install_configuration_table: unsafe extern "efiapi" fn(guid: *const GUID, table: *mut ()) -> Status,
 	/// bootpolicy: IN, parentimagehandle: IN, devicepath: IN, sourcebuffer: IN, sourcesize: IN, imagehandle: OUT
-	pub load_image: unsafe extern "efiapi" fn(bootpolicy: bool, parentimagehandle: *mut (), devicepath: *const DevicePathProtocol, sourcebuffer: *mut (), sourcesize: usize, imagehandle: *mut *mut ()) -> Status,
+	pub load_image:
+		unsafe extern "efiapi" fn(bootpolicy: bool, parentimagehandle: *mut (), devicepath: *const DevicePathProtocol, sourcebuffer: *mut (), sourcesize: usize, imagehandle: *mut *mut ()) -> Status,
 	/// imagehandle: IN, exitdatasize: OUT, exitdata: OUT
 	pub start_image: unsafe extern "efiapi" fn(imagehandle: *mut (), exitdatasize: *mut usize, exitdata: *mut *const Char16) -> Status,
 	/// imagehandle: IN, exitstatus: IN, exitdatasize: IN, exitdata: IN
@@ -157,7 +165,14 @@ pub struct BootServices {
 	/// buffer: IN, size: IN, value: IN
 	pub set_mem: unsafe extern "efiapi" fn(buffer: *mut (), size: usize, value: u8), // EFI 1.1
 	/// eventtype: IN, notifytpl: IN, notifyfuntion: IN, notifycontext: IN CONST, eventgroup: IN CONST, event: OUT
-	pub create_event_ex: unsafe extern "efiapi" fn(eventtype: u32, notifytpl: TaskPriorityLevel, notifyfunction: Option<extern "efiapi" fn(event: Event, context: &())>, notifycontext: Option<&()>, eventgroup: Option<&GUID>, event: &mut Event) -> Status, // EFI 2.0
+	pub create_event_ex: unsafe extern "efiapi" fn(
+		eventtype: u32,
+		notifytpl: TaskPriorityLevel,
+		notifyfunction: Option<extern "efiapi" fn(event: Event, context: &())>,
+		notifycontext: Option<&()>,
+		eventgroup: Option<&GUID>,
+		event: &mut Event,
+	) -> Status, // EFI 2.0
 }
 impl BootServices {
 	pub const SIGNATURE: u64 = 0x56524553544F4F42;
@@ -189,6 +204,7 @@ impl BootServices {
 	/// returns the previous task priority level, which is to be restored later with a matching call to [`BootServices::restoretpl`].
 	pub unsafe fn raise_tpl(&self, newtpl: TaskPriorityLevel) -> TaskPriorityLevel {
 		// SAFETY:
+		// todo
 		unsafe { (self.raise_tpl)(newtpl) }
 	}
 
@@ -208,14 +224,15 @@ impl BootServices {
 	/// None.
 	pub unsafe fn restore_tpl(&self, oldtpl: TaskPriorityLevel) {
 		// SAFETY:
+		// todo
 		unsafe { (self.restore_tpl)(oldtpl) }
 	}
 
 	pub fn wait_for_event(&self, events: &[Event]) -> Result<usize, Status> {
 		let mut index = 0;
 		// SAFETY:
-		unsafe { (self.wait_for_event)(events.len(), events.as_ptr(), &mut index) }
-			.into_result(index)
+		// todo
+		unsafe { (self.wait_for_event)(events.len(), events.as_ptr(), &mut index) }.into_result(index)
 	}
 	// pub fn handle_protocol<T: Protocol>(&self, handle: *mut ()) -> Result<*mut ()<T>, Status> {
 	// 	let mut interface = core::ptr::null();

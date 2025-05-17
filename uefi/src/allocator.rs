@@ -4,6 +4,7 @@ struct UEFIAllocator;
 static ALLOCATOR: UEFIAllocator = UEFIAllocator;
 
 // SAFETY:
+// todo
 unsafe impl core::alloc::GlobalAlloc for UEFIAllocator {
 	unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
 		todo!()

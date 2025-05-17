@@ -78,7 +78,8 @@ impl Status {
 	pub const END_OF_MEDIA: Status = Status(Error::EndOfMedia as usize);
 	pub const END_OF_FILE: Status = Status(Error::EndOfFile as usize);
 	pub const INVALID_LANGUAGE: Status = Status(Error::InvalidLanguage as usize);
-	pub const COMPROMISED_DATA: Status = Status(Error::CompromisedData as usize); pub const IP_ADDRESS_CONFLICT: Status = Status(Error::IPAddressConflict as usize);
+	pub const COMPROMISED_DATA: Status = Status(Error::CompromisedData as usize);
+	pub const IP_ADDRESS_CONFLICT: Status = Status(Error::IPAddressConflict as usize);
 	pub const ERROR_HTTP: Status = Status(Error::Http as usize);
 }
 #[repr(C)]

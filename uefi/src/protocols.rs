@@ -3,14 +3,14 @@ use crate::{
 	status::Status,
 };
 
-pub mod graphics;
-pub mod string;
-pub mod serial;
-pub mod image;
-pub mod debug;
 pub mod acpi;
+pub mod debug;
 pub mod file;
+pub mod graphics;
+pub mod image;
 pub mod path;
+pub mod serial;
+pub mod string;
 pub mod text;
 
 pub trait Protocol {
@@ -22,7 +22,7 @@ pub struct DecompressProtocol {
 	/// this: IN, source: IN, sourcesize: IN, destinationsize: OUT, scratchsize: OUT
 	pub get_info: unsafe extern "efiapi" fn(this: *const Self, source: *const (), sourcesize: u32, destinationsize: *mut u32, scratchsize: *mut u32) -> Status,
 	/// this: IN, source: IN, sourcesize: IN, destination: IN OUT, destinationsize: IN, scratch: IN OUT, scratchsize: IN
-	pub decompress: unsafe extern "efiapi" fn(this: *const Self,  source: *const (), sourcesize: u32, destination: *mut (), destinationsize: u32, scratch: *mut (), scratchsize: u32) -> Status,
+	pub decompress: unsafe extern "efiapi" fn(this: *const Self, source: *const (), sourcesize: u32, destination: *mut (), destinationsize: u32, scratch: *mut (), scratchsize: u32) -> Status,
 }
 impl Protocol for DecompressProtocol {
 	/// GUID: D8117CFE-94A6-11D4-9A3A-0090273FC14D

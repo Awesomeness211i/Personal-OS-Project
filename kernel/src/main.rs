@@ -18,6 +18,7 @@ fn _start(data: kernel::KernelData) -> ! {
 	// 	Ok(runtime) => runtime,
 	// 	Err(_) => panic!(),
 	// };
+
 	let buffer = unsafe { core::slice::from_raw_parts_mut(data.graphics, data.graphicslen) };
 	let mask = uefi::protocols::graphics::PixelBitmask::new(0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
 	let white = uefi::protocols::graphics::GraphicsOutputProtocol::grapics_color(0xFFFFFFFF, &mask);

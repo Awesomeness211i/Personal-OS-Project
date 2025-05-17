@@ -1,9 +1,9 @@
 use super::{
 	Bool,
-	GUID,
 	Char16,
-	services,
+	GUID,
 	protocols::text,
+	services,
 };
 
 // #[derive(core::marker::ConstParamTy, PartialEq, Eq)]

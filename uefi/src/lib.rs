@@ -16,13 +16,13 @@ extern crate alloc;
 #[cfg(feature = "allocator")]
 pub mod allocator;
 
-mod strings;
+pub mod chars;
 pub mod memory;
 pub mod protocols;
 pub mod services;
 pub mod status;
+mod strings;
 pub mod tables;
-pub mod chars;
 
 pub use chars::{
 	Char8,
@@ -222,15 +222,24 @@ impl GUID {
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct PhysicalAddress(u64);
 impl PhysicalAddress {
-	pub fn get(&self) -> u64 { self.0 }
-	pub fn to_ptr<T>(&self) -> *mut T { self.0 as *mut T }
+	pub fn new(value: u64) -> Self {
+		Self(value)
+	}
+	pub fn get(&self) -> u64 {
+		self.0
+	}
+	pub fn to_ptr<T>(&self) -> *mut T {
+		self.0 as *mut T
+	}
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct VirtualAddress(u64);
 impl VirtualAddress {
-	pub fn get(&self) -> u64 { self.0 }
+	pub fn get(&self) -> u64 {
+		self.0
+	}
 }
 
 pub type IpV4Address = core::net::Ipv4Addr;

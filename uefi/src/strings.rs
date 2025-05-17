@@ -16,6 +16,7 @@ impl CStr8 {
 		let ptr = ptr.cast::<u8>();
 		let mut len = 0;
 		// SAFETY:
+		// todo
 		unsafe {
 			while *(ptr.add(len)) != 0 {
 				len += 1;
@@ -30,6 +31,7 @@ impl CStr8 {
 	/// string
 	pub const unsafe fn from_u8_with_nul_unchecked(codes: &[u8]) -> &Self {
 		// SAFETY:
+		// todo
 		unsafe { &*(codes as *const [u8] as *const Self) }
 	}
 
@@ -47,6 +49,7 @@ impl CStr8 {
 
 	pub const fn as_bytes(&self) -> &[u8] {
 		// SAFETY:
+		// todo
 		unsafe { &*core::ptr::slice_from_raw_parts(self.as_ptr() as *const u8, self.len()) }
 	}
 }
@@ -62,6 +65,7 @@ impl CStr16 {
 		let ptr = ptr.cast::<u16>();
 		let mut len = 0;
 		// SAFETY:
+		// todo
 		unsafe {
 			while *(ptr.add(len)) != 0 {
 				len += 1;
@@ -75,6 +79,7 @@ impl CStr16 {
 	/// completely unsafe
 	pub const unsafe fn from_u16_with_nul_unchecked(chars: &[u16]) -> &Self {
 		// SAFETY:
+		// todo
 		unsafe { &*(chars as *const [u16] as *const Self) }
 	}
 
@@ -92,6 +97,7 @@ impl CStr16 {
 
 	pub const fn as_bytes(&self) -> &[u8] {
 		// SAFETY:
+		// todo
 		unsafe { core::slice::from_raw_parts(self.as_ptr().cast(), self.len() * 2) }
 	}
 }

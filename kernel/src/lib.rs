@@ -9,7 +9,10 @@ pub struct KernelData {
 }
 
 impl KernelData {
-	pub fn new(graphics: *mut uefi::protocols::graphics::GraphicsPixel, graphicslen: usize, /* systemtable: uefi::Handle<uefi::tables::SystemTable>, imagehandle: uefi::Handle, memorymap: uefi::memory::MemoryMap */) -> KernelData {
+	pub fn new(
+		graphics: *mut uefi::protocols::graphics::GraphicsPixel,
+		graphicslen: usize, /* systemtable: uefi::Handle<uefi::tables::SystemTable>, imagehandle: uefi::Handle, memorymap: uefi::memory::MemoryMap */
+	) -> KernelData {
 		KernelData {
 			graphics,
 			graphicslen,
