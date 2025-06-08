@@ -208,13 +208,16 @@ pub struct GUID {
 	data4: u64,
 }
 impl GUID {
-	const fn new(data1: u32, data2: u16, data3: u16, data4: u64) -> Self {
+	pub const fn new(data1: u32, data2: u16, data3: u16, data4: u64) -> Self {
 		Self {
 			data1: data1.to_le(),
 			data2: data2.to_le(),
 			data3: data3.to_le(),
 			data4: data4.to_be(),
 		}
+	}
+	pub const fn data(&self) -> u128 {
+		((self.data1 as u128) << (32 * 3)) | ((self.data2 as u128) << (32 * 2 + 16)) | ((self.data3 as u128) << (32 * 2)) | (self.data4.swap_bytes() as u128)
 	}
 }
 

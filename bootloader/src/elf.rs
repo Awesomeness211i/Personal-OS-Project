@@ -1,11 +1,17 @@
 use core::{
+	error::Error,
+	fmt::{
+		Display,
+		Formatter,
+	},
 	num,
 	ops,
 	ptr,
 	slice,
 };
 
-pub enum TestError {
+#[derive(Debug)]
+pub enum ELFError {
 	Unknown,
 	NotELF,
 	UnsupportedOSABI,
@@ -16,60 +22,69 @@ pub enum TestError {
 	UnsupportedEndianness,
 	UnsupportedArchitectureWidth,
 }
+impl Display for ELFError {
+	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+		write!(f, "{self:?}")
+	}
+}
+impl Error for ELFError {}
 
 pub struct Elf<'a>(&'a mut [u8]);
 impl Elf<'_> {
-	pub fn new(ptr: *mut u8, len: usize) -> Result<Self, TestError> {
+	pub fn new(ptr: *mut u8, len: usize) -> Result<Self, ELFError> {
 		let Some(ptr) = ptr::NonNull::new(ptr) else {
-			return Err(TestError::NotELF);
+			return Err(ELFError::NotELF);
 		};
 		// Safety:
 		// should be fine to dereference a NonNull and we are doing this to check the file type
 		let header_ptr = unsafe { &*(ptr.as_ptr() as *const ElfHeader) };
 
-		if &header_ptr.identifier[0..4] != b"\x7FELF"
+		if &header_ptr.identifier[..4] != b"\x7FELF"
 		/* magic */
 		{
-			return Err(TestError::NotELF);
+			return Err(ELFError::NotELF);
 		}
 		if header_ptr.identifier[4] != 2
 		/* 64 bit */
 		{
-			return Err(TestError::UnsupportedArchitectureWidth);
+			return Err(ELFError::UnsupportedArchitectureWidth);
 		}
 		if header_ptr.identifier[5] != 1
 		/* little endian */
 		{
-			return Err(TestError::UnsupportedEndianness);
+			return Err(ELFError::UnsupportedEndianness);
 		}
 		if header_ptr.identifier[6] != 1
 		/* elf version */
 		{
-			return Err(TestError::UnsupportedELFVersion);
+			return Err(ELFError::UnsupportedELFVersion);
 		}
 		if header_ptr.identifier[7] != 0
 		/* system v */
 		{
-			return Err(TestError::UnsupportedOSABI);
+			return Err(ELFError::UnsupportedOSABI);
 		}
 		if header_ptr.identifier[8] != 0
 		/* abi version */
 		{
-			return Err(TestError::UnsupportedOSABIVersion);
+			return Err(ELFError::UnsupportedOSABIVersion);
 		}
 		if &header_ptr.identifier[9..] != b"\x00\x00\x00\x00\x00\x00\x00"
 		/* padding */
 		{
-			return Err(TestError::Unknown);
+			return Err(ELFError::Unknown);
 		}
 		if header_ptr.executable_type != ExecutableType::DYNAMIC {
-			return Err(TestError::UnsupportedExecutableType);
+			return Err(ELFError::UnsupportedExecutableType);
 		}
 		if header_ptr.machine != Machine::X86_64 {
-			return Err(TestError::UnsupportedMachine);
+			return Err(ELFError::UnsupportedMachine);
 		}
 		if header_ptr.version != 1 {
-			return Err(TestError::UnsupportedELFVersion);
+			return Err(ELFError::UnsupportedELFVersion);
+		}
+		if header_ptr.elf_header_size as usize != size_of::<ElfHeader>() {
+			return Err(ELFError::UnsupportedELFVersion);
 		}
 
 		// Safety:
@@ -105,6 +120,10 @@ impl Machine {
 	pub const M32: Self = Self(0x01);
 	pub const SPARC: Self = Self(0x02);
 	pub const I386: Self = Self(0x03);
+	pub const M68K: Self = Self(0x04);
+	pub const M88K: Self = Self(0x05);
+	pub const IAMCU: Self = Self(0x06);
+	pub const I860: Self = Self(0x07);
 
 	pub const X86_64: Self = Self(0x3E);
 
@@ -127,7 +146,7 @@ pub struct ElfHeader {
 	/// e_version:
 	pub version: u32,
 	/// e_entry: Virtual address to which the system first transfers control if no entry point it holds 0.
-	pub entry: usize,
+	pub entry: Option<ptr::NonNull<u8>>,
 	/// e_phoff: Program header table file offset in bytes if no program header table it holds 0.
 	pub program_header_offset: Option<num::NonZeroUsize>,
 	/// e_shoff: Section header table file offset in bytes if no section header table it holds 0.
@@ -139,13 +158,16 @@ pub struct ElfHeader {
 	/// e_phentsize: Program header table entry size in bytes.
 	pub program_header_entry_size: u16,
 	/// e_phnum: Program header table number of entries.
-	pub program_header_num: u16,
+	/// If number of program headers >= PN_XNUM(0xFFFF) then program_header_num is set to 0xFFFF and the actual number is in section_header_info field of the section header at index 0 otherwise section_header_info is 0
+	pub program_header_num: Option<num::NonZeroU16>,
 	/// e_shentsize: Section header entry size in bytes.
 	pub section_header_entry_size: u16,
 	/// e_shnum: Section header table number of entries.
-	/// If entries >= 0xFF00 then has value of SHN_UNDEF(0) and actual number of header table entries is in sh_size field of section header at index 0.
-	pub section_header_num: u16,
-	/// e_shstrndx: Section header table index of string table if no string table then it is 0.
+	/// If entries >= 0xFF00 then has value of SHN_UNDEF(0) and actual number of header table entries is in size field of section header at index 0.
+	pub section_header_num: Option<num::NonZeroU16>,
+	/// e_shstrndx: Section header table index of string table.
+	/// If no string table then it is SHN_UNDEF(0) and if entries >= SHN_LORESERVE(0xFF00) then it has the value SHN_XINDEX(0xFFFF) and the actual
+	/// index is in the link field of section header at index 0 otherwise the link field contains 0.
 	pub section_header_string_index: Option<num::NonZeroU16>,
 }
 
@@ -164,13 +186,13 @@ pub struct Elf64ProgramHeader {
 #[repr(C)]
 pub struct Elf32ProgramHeader {
 	pub p_type: u32,
-	pub p_offset: usize,
-	pub p_vaddr: usize,
-	pub p_paddr: usize,
-	pub p_filesz: usize,
-	pub p_memsz: usize,
+	pub p_offset: u32,
+	pub p_vaddr: u32,
+	pub p_paddr: u32,
+	pub p_filesz: u32,
+	pub p_memsz: u32,
 	pub p_flags: u32,
-	pub p_align: usize,
+	pub p_align: u32,
 }
 
 #[repr(transparent)]
@@ -199,15 +221,45 @@ impl SectionHeaderType {
 }
 
 #[repr(C)]
-pub struct ElfSectionHeader {
-	pub sh_name: u32,
-	pub sh_type: SectionHeaderType,
-	pub sh_flags: usize,
-	pub sh_addr: usize,
-	pub sh_offset: usize,
-	pub sh_size: usize,
-	pub sh_link: u32,
-	pub sh_info: u32,
-	pub sh_addralign: usize,
-	pub sh_entsize: usize,
+pub struct Elf64SectionHeader {
+	/// Index into section header string table
+	pub name: u32,
+	pub section_header_type: SectionHeaderType,
+	pub flags: u64,
+	/// If appears in memory image of process gives address that it should reside at otherwise 0
+	pub address: Option<num::NonZeroU64>,
+	/// Gives byte offset from beginning of file to first byte in the section
+	pub offset: u64,
+	/// Sections size in bytes if it isn't type SHT_NOBITS
+	pub size: u64,
+	/// Section header index link that interpretation depends on the type of section
+	pub link: u32,
+	/// Holds extra information that interpretation depends on section type
+	pub info: u32,
+	pub address_align: u64,
+	/// For sections that hold a table of fixed size entries this gives the size in bytes of the
+	/// entry and 0 otherwise
+	pub entry_size: Option<num::NonZeroU64>,
+}
+
+#[repr(C)]
+pub struct Elf32SectionHeader {
+	/// Index into section header string table
+	pub name: u32,
+	pub section_header_type: SectionHeaderType,
+	pub flags: u32,
+	/// If appears in memory image of process gives address that it should reside at otherwise 0
+	pub address: Option<num::NonZeroU32>,
+	/// Gives byte offset from beginning of file to first byte in the section
+	pub offset: u32,
+	/// Sections size in bytes if it isn't type SHT_NOBITS
+	pub size: u32,
+	/// Section header index link that interpretation depends on the type of section
+	pub link: u32,
+	/// Holds extra information that interpretation depends on section type
+	pub info: u32,
+	pub address_align: u32,
+	/// For sections that hold a table of fixed size entries this gives the size in bytes of the
+	/// entry and 0 otherwise
+	pub entry_size: Option<num::NonZeroU32>,
 }

@@ -9,6 +9,8 @@ test = false
 bench = false
 
 [dependencies]
+acpi = { path = "../acpi/" }
 uefi = { path = "../uefi" }
 kernel = { path = "../kernel" }
 arch = { path = "../arch" }
+

@@ -10,4 +10,6 @@ bench = false
 
 [dependencies]
 uefi = { path = "../uefi" }
+acpi = { path = "../acpi" }
 arch = { path = "../arch" }
+

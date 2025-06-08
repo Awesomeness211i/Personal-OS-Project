@@ -5,6 +5,7 @@ use super::{
 	protocols::text,
 	services,
 };
+use crate::protocols::image::LoadedImageProtocol;
 
 // #[derive(core::marker::ConstParamTy, PartialEq, Eq)]
 // enum TableStates {
@@ -33,8 +34,8 @@ pub struct TableHeader {
 
 #[repr(C)]
 pub struct ConfigurationTable {
-	vendorguid: GUID,
-	vendortable: *const (),
+	pub vendorguid: GUID,
+	pub vendortable: *const (),
 }
 impl ConfigurationTable {
 	/// GUID: 8868E871-E4F1-11D3-BC22-0080C73C8881
@@ -87,6 +88,7 @@ impl RTPropertiesTable {
 	pub const SUPPORTED_QUERY_CAPSULE_CAPABILITIES: u32 = 0x1000;
 	pub const SUPPORTED_QUERY_VARIABLE_INFO: u32 = 0x2000;
 }
+
 #[repr(C)]
 #[deprecated]
 pub struct PropertiesTable {
@@ -94,20 +96,69 @@ pub struct PropertiesTable {
 	length: u32,
 	memoryprotectionattribute: u64,
 }
+
+#[repr(C)]
+pub struct SystemResourceTable {
+	firmware_resource_count: u32,
+	firmware_resource_count_max: u32,
+	firmware_resource_version: u64,
+	// entries: [SystemResourceEntry],
+}
+impl SystemResourceTable {
+	pub const GUID: GUID = GUID::new(0xB122A263, 0x3661, 0x4F68, 0x9929_78F8B0D62180);
+}
+#[repr(C)]
+pub struct SystemResourceEntry {
+	firmware_class: GUID,
+	firmware_tyep: u32,
+	firmware_version: u32,
+	lowest_supported_firmware_version: u32,
+	capsule_flags: u32,
+	last_attempt_version: u32,
+	last_attempt_status: u32,
+}
+
+#[repr(C)]
+pub struct DebugImageInfoTable {
+	/// volatile
+	update_status: u32,
+	table_size: u32,
+	debug_image_info_table: *const DebugImageInfo,
+}
+impl DebugImageInfoTable {
+	pub const GUID: GUID = GUID::new(0x49152E77, 0x1ADA, 0x4764, 0xB7A2_7AFEFED95E8B);
+}
+
+#[repr(C)]
+struct DebugImageInfoNormal {
+	image_info_type: u32,
+	loaded_image_protocol_instance: *const LoadedImageProtocol,
+	image_handle: *const (),
+}
+
+#[repr(C)]
+union DebugImageInfo {
+	image_info_type: *const u32,
+	normal_image: *const DebugImageInfoNormal,
+}
+
 #[repr(C)]
 pub struct MemoryAttributesTable {
 	version: u32,
 	numentries: u32,
 	descriptorsize: u32,
 	flags: u32,
+	// entry: [MemoryDescriptor],
 }
 impl MemoryAttributesTable {
 	pub const GUID: GUID = GUID::new(0xDCFA911D, 0x26EB, 0x469F, 0xA220_38B7DC461220);
 }
+
 #[repr(C)]
 pub struct ConformanceProfilesTable {
 	version: u16,
 	numprofiles: u16,
+	// conformance_profiles: [GUID],
 }
 impl ConformanceProfilesTable {
 	pub const GUID: GUID = GUID::new(0x36122546, 0xF7E7, 0x4C8F, 0xBD9B_EB8525B50C0B);
