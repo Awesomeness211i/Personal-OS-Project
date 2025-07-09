@@ -98,11 +98,11 @@ impl MemoryType {
 #[repr(C)]
 pub struct MemoryDescriptor {
 	/// Type of memory occupying this range.
-	pub regiontype: MemoryType,
-	pub physicalstart: PhysicalAddress,
-	pub virtualstart: VirtualAddress,
+	pub region_type: MemoryType,
+	pub physical_start: PhysicalAddress,
+	pub virtual_start: VirtualAddress,
 	/// Number of 4 KiB pages contained in this range.
-	pub numofpages: u64,
+	pub num_pages: u64,
 	pub attribute: Attribute,
 }
 

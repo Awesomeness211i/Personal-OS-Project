@@ -225,13 +225,13 @@ impl GUID {
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct PhysicalAddress(u64);
 impl PhysicalAddress {
-	pub fn new(value: u64) -> Self {
+	pub const fn new(value: u64) -> Self {
 		Self(value)
 	}
-	pub fn get(&self) -> u64 {
+	pub const fn get(&self) -> u64 {
 		self.0
 	}
-	pub fn to_ptr<T>(&self) -> *mut T {
+	pub const fn to_ptr<T>(&self) -> *mut T {
 		self.0 as *mut T
 	}
 }
