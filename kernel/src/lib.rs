@@ -1,9 +1,9 @@
 #![no_std]
 
-use acpi::{
-	RootSystemDescriptionPointer,
-	RootSystemDescriptionPointerEx,
-};
+// use acpi::{
+// 	RootSystemDescriptionPointer,
+// 	RootSystemDescriptionPointerEx,
+// };
 
 pub struct KernelData {
 	pub graphics: *mut uefi::protocols::graphics::GraphicsPixel,

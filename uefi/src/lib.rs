@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(adt_const_params, extended_varargs_abi_support)]
+#![feature(adt_const_params)]
 #![deny(clippy::undocumented_unsafe_blocks)]
 //! # UEFI
 //! Library for interfacing with the UEFI specification
@@ -10,12 +10,6 @@
 //! CONST = Read only
 //! EFIAPI = UEFI calling convention
 
-#[cfg(feature = "allocator")]
-extern crate alloc;
-
-#[cfg(feature = "allocator")]
-pub mod allocator;
-
 pub mod chars;
 pub mod memory;
 pub mod protocols;
@@ -24,14 +18,21 @@ pub mod status;
 mod strings;
 pub mod tables;
 
-pub use chars::{
-	Char8,
-	Char16,
-};
-pub use strings::{
-	CStr8,
-	CStr16,
-};
+use core::ffi::c_char;
+
+pub use chars::Char16;
+pub use strings::CStr16;
+
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct SystemTablePointer<'a>(&'a tables::SystemTable);
+
+impl core::ops::Deref for SystemTablePointer<'_> {
+	type Target = tables::SystemTable;
+	fn deref(&self) -> &Self::Target {
+		self.0
+	}
+}
 
 /// Type just to interpret C like boolean this is needed only because hardware vendors tend to use
 /// C like conventions for implementing booleans despite the standard saying booleans should only
@@ -111,7 +112,7 @@ pub struct EFIPartitionEntry {
 
 #[repr(C)]
 pub struct EFIBlockTranslationTableInfoBlock {
-	sig: [Char8; 16],
+	sig: [c_char; 16],
 	uuid: GUID,
 	parentuuid: GUID,
 	flags: u32,
@@ -128,7 +129,7 @@ pub struct EFIBlockTranslationTableInfoBlock {
 	mapoff: u64,
 	flogoff: u64,
 	infooff: u64,
-	unused: [Char8; 3968],
+	unused: [c_char; 3968],
 	checksum: u64,
 }
 

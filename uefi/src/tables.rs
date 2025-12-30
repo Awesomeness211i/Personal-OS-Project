@@ -102,7 +102,7 @@ pub struct SystemResourceTable {
 	firmware_resource_count: u32,
 	firmware_resource_count_max: u32,
 	firmware_resource_version: u64,
-	// entries: [SystemResourceEntry],
+	entries: [SystemResourceEntry],
 }
 impl SystemResourceTable {
 	pub const GUID: GUID = GUID::new(0xB122A263, 0x3661, 0x4F68, 0x9929_78F8B0D62180);
@@ -167,7 +167,7 @@ impl ConformanceProfilesTable {
 #[repr(C)]
 pub struct SystemTable {
 	pub header: TableHeader,
-	pub firmware_vendor: *const Char16,
+	firmware_vendor: *const Char16,
 	pub firmware_revision: u32,
 	pub console_in_handle: *const (),
 	pub console_in: *const text::SimpleTextInputProtocol,

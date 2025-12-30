@@ -171,9 +171,17 @@ pub struct ElfHeader {
 	pub section_header_string_index: Option<num::NonZeroU16>,
 }
 
+#[non_exhaustive]
+#[derive(Debug, PartialEq, Eq)]
+pub struct ProgramHeaderType(u32);
+impl ProgramHeaderType {
+	pub const NULL: Self = Self(0);
+	pub const LOAD: Self = Self(1);
+}
+
 #[repr(C)]
 pub struct Elf64ProgramHeader {
-	pub p_type: u32,
+	pub p_type: ProgramHeaderType,
 	pub p_flags: u32,
 	pub p_offset: usize,
 	pub p_vaddr: usize,
@@ -182,6 +190,8 @@ pub struct Elf64ProgramHeader {
 	pub p_memsz: usize,
 	pub p_align: usize,
 }
+
+impl Elf64ProgramHeader {}
 
 #[repr(C)]
 pub struct Elf32ProgramHeader {
@@ -194,6 +204,8 @@ pub struct Elf32ProgramHeader {
 	pub p_flags: u32,
 	pub p_align: u32,
 }
+
+impl Elf32ProgramHeader {}
 
 #[repr(transparent)]
 pub struct SectionHeaderType(u32);

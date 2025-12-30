@@ -1,26 +1,28 @@
+use core::ffi::c_void;
+
 use crate::{
 	GUID,
+	memory::MemoryType,
 	status::Status,
 	tables::SystemTable,
-	memory::MemoryType,
 };
 
 #[repr(C)]
 pub struct LoadedImageProtocol {
 	pub revision: u32,
-	parent_handle: *const (),
+	parent_handle: *const c_void,
 	system_table: *const SystemTable,
-	pub device_handle: *const (),
+	pub device_handle: *const c_void,
 	file_path: *const super::path::DevicePathProtocol,
-	reserved: *const (),
+	reserved: *const c_void,
 	load_options_size: u32,
-	load_options: *const (),
-	image_base: *const (),
+	load_options: *const c_void,
+	image_base: *const c_void,
 	image_size: u64,
 	image_code_type: MemoryType,
 	image_data_type: MemoryType,
 	/// handle: IN
-	unload: unsafe extern "efiapi" fn(handle: *const ()) -> Status,
+	unload: unsafe extern "efiapi" fn(handle: *const c_void) -> Status,
 }
 impl super::Protocol for LoadedImageProtocol {
 	/// GUID: 5B1B31A1-9562-11D2-8E3F-00A0C969723B

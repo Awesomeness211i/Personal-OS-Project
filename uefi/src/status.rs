@@ -52,7 +52,7 @@ impl Status {
 	pub const INVALID_PARAMETER: Status = Status(Error::InvalidParameter as usize);
 	pub const UNSUPPORTED: Status = Status(Error::Unsupported as usize);
 	pub const BAD_BUFFER_SIZE: Status = Status(Error::BadBufferSize as usize);
-	pub const ERROR_BUFFER_TOO_SMALL: Status = Status(Error::BufferTooSmall as usize);
+	pub const BUFFER_TOO_SMALL: Status = Status(Error::BufferTooSmall as usize);
 	pub const NOT_READY: Status = Status(Error::NotReady as usize);
 	pub const ERROR_DEVICE: Status = Status(Error::Device as usize);
 	pub const WRITE_PROTECTED: Status = Status(Error::WriteProtected as usize);

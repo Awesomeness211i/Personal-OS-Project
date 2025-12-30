@@ -1,15 +1,5 @@
-struct UEFIAllocator;
+use core::mem::MaybeUninit;
 
-#[global_allocator]
-static ALLOCATOR: UEFIAllocator = UEFIAllocator;
+use crate::SystemTablePointer;
 
-// SAFETY:
-// todo
-unsafe impl core::alloc::GlobalAlloc for UEFIAllocator {
-	unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
-		todo!()
-	}
-	unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
-		todo!()
-	}
-}
+pub static mut SYSTEM_TABLE: MaybeUninit<SystemTablePointer> = MaybeUninit::uninit();

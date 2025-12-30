@@ -1,14 +1,16 @@
+use core::ffi::c_void;
+
 use crate::{
-	GUID,
-	Event,
 	CStr16,
 	Char16,
-	tables::Time,
-	status::Status,
+	Event,
+	GUID,
 	protocols::{
 		Protocol,
-		path::DevicePathProtocol
+		path::DevicePathProtocol,
 	},
+	status::Status,
+	tables::Time,
 };
 
 #[repr(C)]
@@ -78,7 +80,7 @@ pub struct FileIOToken {
 	pub event: Event,
 	pub status: Status,
 	pub buffersize: usize,
-	pub buffer: *const (),
+	pub buffer: *const c_void,
 }
 
 #[repr(C)]
@@ -91,17 +93,17 @@ pub struct FileProtocol {
 	/// this: IN
 	pub delete: unsafe extern "efiapi" fn(this: *const Self) -> Status,
 	/// this: IN, buffersize: IN OUT, buffer: OUT
-	pub read: unsafe extern "efiapi" fn(this: *const Self, buffersize: *mut usize, buffer: *mut ()) -> Status,
+	pub read: unsafe extern "efiapi" fn(this: *const Self, buffersize: *mut usize, buffer: *mut c_void) -> Status,
 	/// this: IN, buffersize: IN OUT, buffer: IN
-	pub write: unsafe extern "efiapi" fn(this: *const Self, buffersize: *mut usize, buffer: *const ()) -> Status,
+	pub write: unsafe extern "efiapi" fn(this: *const Self, buffersize: *mut usize, buffer: *const c_void) -> Status,
 	/// this: IN, position: OUT
 	pub get_position: unsafe extern "efiapi" fn(this: *const Self, position: *mut u64) -> Status,
 	/// this: IN, position: IN
 	pub set_position: unsafe extern "efiapi" fn(this: *const Self, position: u64) -> Status,
 	/// this: IN, infotype: IN, buffersize: IN OUT, buffer: OUT
-	pub get_info: unsafe extern "efiapi" fn(this: *const Self, infotype: *const GUID, buffersize: *mut usize, buffer: *mut ()) -> Status,
+	pub get_info: unsafe extern "efiapi" fn(this: *const Self, infotype: *const GUID, buffersize: *mut usize, buffer: *mut c_void) -> Status,
 	/// this: IN, infotype: IN, buffersize: IN, buffer: IN
-	pub set_info: unsafe extern "efiapi" fn(this: *const Self, infotype: *const GUID, buffersize: usize, buffer: *const ()) -> Status,
+	pub set_info: unsafe extern "efiapi" fn(this: *const Self, infotype: *const GUID, buffersize: usize, buffer: *const c_void) -> Status,
 	/// this: IN
 	pub flush: unsafe extern "efiapi" fn(this: *const Self) -> Status,
 	/// this: IN, newhandle: OUT, filename: IN, openmode: IN, attributes: IN, token: IN OUT

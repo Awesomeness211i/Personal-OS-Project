@@ -38,3 +38,19 @@ pub unsafe fn enable_interrupts() {
 	// unsafe
 	unsafe { core::arch::asm!("sti") };
 }
+
+pub unsafe fn rdmsr(ecx: u32) -> u64 {
+	let eax: u32;
+	let edx: u32;
+	// Safety:
+	// unsafe
+	unsafe {
+		core::arch::asm!(
+			"rdmsr",
+			in("ecx") ecx,
+			out("eax") eax,
+			out("edx") edx,
+		)
+	};
+	((edx as u64) << 32) | (eax as u64)
+}

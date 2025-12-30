@@ -4,6 +4,7 @@ use super::{
 };
 
 #[repr(transparent)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct Attribute(u64);
 impl Attribute {
 	/// Supports memory region being configured to not cacheable.
@@ -47,6 +48,12 @@ impl Attribute {
 	/// cryptographic capabilities. If this flag is clear the memory region is not capable of being
 	/// protected with the cpu's memory cryptographic capabilities.
 	pub const CPU_CRYPTO: Self = Self(0x0000000000080000);
+	/// If this flag is set the memory region is present and capable of having memory dynamically
+	/// removed from the platform. This serves as a hint to the OS prior to ACPI subsystem
+	/// initialization to avoid allocating this memory for core OS data or code that can't be
+	/// dynamically relocated at runtime. If it is clear then the memory region can't be
+	/// dynamically removed from the platform at runtime.
+	pub const HOT_PLUGGABLE: Self = Self(0x0000000000100000);
 	/// Memory region needs to be given a virtual mapping by OS when SetVirtualAddressMap() is
 	/// called.
 	pub const RUNTIME: Self = Self(0x8000000000000000);
@@ -58,6 +65,9 @@ impl Attribute {
 	pub const ISA_MASK: Self = Self(0x0FFFF00000000000);
 }
 
+/// MemoryType values in the range 0x70000000..0x7FFFFFFF are reserved for OEM
+/// use. MemoryType values in the range 0x80000000..0xFFFFFFFF are reserved for use by UEFI OS loaders that
+/// are provided by operating system vendors.
 #[repr(transparent)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct MemoryType(u32);

@@ -13,6 +13,10 @@ pub mod serial;
 pub mod string;
 pub mod text;
 
+pub trait HasGUID {
+	const GUID: GUID;
+}
+
 pub trait Protocol {
 	const GUID: GUID;
 }
