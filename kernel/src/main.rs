@@ -1,31 +1,20 @@
-#![no_std]
+// #![warn(missing_docs)]
 #![no_main]
+#![no_std]
+//! # KERNEL
+//! Starting executable file for the kernel for my hobby OS project.
+
+use bootloader::boot_info;
 
 #[unsafe(no_mangle)]
-fn _start(data: kernel::KernelData) -> ! {
-	// match system_table.exit_boot_services(image_handle, memmap.mapkey) {
-	// 	Ok(runtime) => {
-	// 	},
-	// 	Err((table, e)) => {
-	// 		let (pool, _, _, _) = memmap.data();
-	// 		table.boot_services().free_pool(pool)?;
-	// 		kernelfile.close()?;
-	// 		rootfs.close()?;
-	// 		Err(e)
-	// 	},
-	// }
-	// let system_table = match data.systemtable.exit_boot_services(data.imagehandle, data.memorymap.mapkey) {
-	// 	Ok(runtime) => runtime,
-	// 	Err(_) => panic!(),
-	// };
-
-	let buffer = unsafe { core::slice::from_raw_parts_mut(data.graphics, data.graphicslen) };
-	let mask = uefi::protocols::graphics::PixelBitmask::new(0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
-	let white = uefi::protocols::graphics::GraphicsOutputProtocol::grapics_color(0xFFFFFFFF, &mask);
-	for pixel in buffer {
-		*pixel = white;
-	}
+fn _start(data: boot_info::KernelDataHeader) -> ! {
 	loop {}
+	// let buffer = unsafe { core::slice::from_raw_parts_mut(data.graphics_ptr, data.graphics_len) };
+	// let mask = uefi::protocols::graphics::PixelBitmask::new(0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
+	// let white = uefi::protocols::graphics::GraphicsOutputProtocol::grapics_color(0xFFFFFFFF, &mask);
+	// for pixel in buffer {
+	// 	*pixel = white;
+	// }
 }
 
 #[panic_handler]

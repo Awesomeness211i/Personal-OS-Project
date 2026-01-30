@@ -1,3 +1,5 @@
+use core::ffi::c_void;
+
 use super::{
 	Bool,
 	Char16,
@@ -34,8 +36,8 @@ pub struct TableHeader {
 
 #[repr(C)]
 pub struct ConfigurationTable {
-	pub vendorguid: GUID,
-	pub vendortable: *const (),
+	pub vendor_guid: GUID,
+	pub vendor_table: *const c_void,
 }
 impl ConfigurationTable {
 	/// GUID: 8868E871-E4F1-11D3-BC22-0080C73C8881
@@ -54,6 +56,12 @@ impl ConfigurationTable {
 	pub const EFI_ACPI_TABLE: GUID = GUID::new(0xEB9D2D30, 0x2D88, 0x11D3, 0x9A16_0090273FC14D);
 	/// GUID: EB9D2D30-2D88-11D3-9A16-0090273FC14D
 	pub const ACPI_TABLE: GUID = GUID::new(0xEB9D2D30, 0x2D88, 0x11D3, 0x9A16_0090273FC14D);
+
+	pub const LZMA_FILESYSTEM: GUID = GUID::new(0xEE4E5898, 0x3914, 0x4259, 0x9D6E_DC7BD79403CF);
+	pub const DXE_SERVICES: GUID = GUID::new(0x05AD34BA, 0x6F02, 0x4214, 0x952E_4DA0398E2BB9);
+	pub const HANDOFF_BLOCK_LIST: GUID = GUID::new(0x7739F24C, 0x93D7, 0x11D4, 0x9A3A_0090273FC14D);
+	pub const MEMORY_TYPE_INFO_TABLE: GUID = GUID::new(0x4C19049F, 0x4137, 0x4DD3, 0x9C10_8B97A83FFDFA);
+	pub const MEMORY_STATUS_CODE_RECORD: GUID = GUID::new(0x060CC026, 0x4C0D, 0x4DDA, 0x8F41_595FEF00A502);
 }
 
 #[repr(C)]

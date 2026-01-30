@@ -14,7 +14,7 @@ use core::{
 pub enum ELFError {
 	Unknown,
 	NotELF,
-	UnsupportedOSABI,
+	UnsupportedOSABI(u8),
 	UnsupportedOSABIVersion,
 	UnsupportedExecutableType,
 	UnsupportedMachine,
@@ -39,6 +39,9 @@ impl Elf<'_> {
 		// should be fine to dereference a NonNull and we are doing this to check the file type
 		let header_ptr = unsafe { &*(ptr.as_ptr() as *const ElfHeader) };
 
+		// Testing code
+		// return Err(ELFError::UnsupportedOSABI(4));
+
 		if &header_ptr.identifier[..4] != b"\x7FELF"
 		/* magic */
 		{
@@ -62,7 +65,7 @@ impl Elf<'_> {
 		if header_ptr.identifier[7] != 0
 		/* system v */
 		{
-			return Err(ELFError::UnsupportedOSABI);
+			return Err(ELFError::UnsupportedOSABI(header_ptr.identifier[7]));
 		}
 		if header_ptr.identifier[8] != 0
 		/* abi version */
@@ -172,11 +175,16 @@ pub struct ElfHeader {
 }
 
 #[non_exhaustive]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ProgramHeaderType(u32);
 impl ProgramHeaderType {
 	pub const NULL: Self = Self(0);
 	pub const LOAD: Self = Self(1);
+	pub const DYNAMIC: Self = Self(2);
+	pub const INTERP: Self = Self(3);
+	pub const NOTE: Self = Self(4);
+	pub const SECTION_HEADER_LIB: Self = Self(5);
+	pub const PROGRAM_HEADER: Self = Self(6);
 }
 
 #[repr(C)]

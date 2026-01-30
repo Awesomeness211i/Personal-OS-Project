@@ -16,7 +16,6 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "arch",
- "kernel",
  "uefi",
 ]
 
@@ -26,6 +25,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "arch",
+ "bootloader",
  "uefi",
 ]
 

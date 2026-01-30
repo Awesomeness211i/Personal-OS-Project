@@ -1,6 +1,7 @@
-#![no_std]
 #![feature(adt_const_params)]
 #![deny(clippy::undocumented_unsafe_blocks)]
+// #![warn(missing_docs)]
+#![no_std]
 //! # UEFI
 //! Library for interfacing with the UEFI specification
 
@@ -25,9 +26,9 @@ pub use strings::CStr16;
 
 #[repr(transparent)]
 #[derive(Clone, Copy)]
-pub struct SystemTablePointer<'a>(&'a tables::SystemTable);
+pub struct SystemTablePointer(&'static tables::SystemTable);
 
-impl core::ops::Deref for SystemTablePointer<'_> {
+impl core::ops::Deref for SystemTablePointer {
 	type Target = tables::SystemTable;
 	fn deref(&self) -> &Self::Target {
 		self.0

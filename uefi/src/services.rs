@@ -87,7 +87,7 @@ pub struct BootServices {
 	/// pages: IN
 	/// The number of contiguous 4 KiB pages to allocate.
 	/// memory: IN OUT
-	/// On input, the way in which the address is used depends on the value of Type. On output the address is set to the base of the page range that was allocated.
+	/// On input, the way in which the address is used depends on the value of allocate_type. On output the address is set to the base of the page range that was allocated.
 	/// Status can return:
 	/// SUCCESS
 	/// OUT_OF_RESOURCES
@@ -204,29 +204,29 @@ impl BootServices {
 	pub const REVISION: u64 = crate::tables::SystemTable::SPECIFICATION_VERSION;
 	/// This function raises the priority of the currently executing task and returns its previous priority level.
 	/// Only three task priority levels are exposed outside of the firmware during boot services execution. The first is
-	/// [`TaskPriorityLevel::Application`] where all normal execution occurs. That level may be interrupted to perform various asynchronous
-	/// interrupt style notifications, which occur at the [`TaskPriorityLevel::Callback`] or [`TaskPriorityLevel::Notify`] level. By raising the
-	/// task priority level to [`TaskPriorityLevel::Notify`] such notifications are masked until the task priority level is restored, thereby
-	/// synchronizing execution with such notifications. Synchronous blocking I/O functions execute at [`TaskPriorityLevel::Notify`].
-	/// [`TaskPriorityLevel::Callback`] is the typically used for application level notification functions. Device drivers will typically
-	/// use [`TaskPriorityLevel::Callback`] or [`TaskPriorityLevel::Notify`] for their notification functions. Applications and drivers may also use
-	/// [`TaskPriorityLevel::Notify`] to protect data structures in critical sections of code.
+	/// [`TaskPriorityLevel::APPLICATION`] where all normal execution occurs. That level may be interrupted to perform various asynchronous
+	/// interrupt style notifications, which occur at the [`TaskPriorityLevel::CALLBACK`] or [`TaskPriorityLevel::NOTIFY`] level. By raising the
+	/// task priority level to [`TaskPriorityLevel::NOTIFY`] such notifications are masked until the task priority level is restored, thereby
+	/// synchronizing execution with such notifications. Synchronous blocking I/O functions execute at [`TaskPriorityLevel::NOTIFY`].
+	/// [`TaskPriorityLevel::CALLBACK`] is the typically used for application level notification functions. Device drivers will typically
+	/// use [`TaskPriorityLevel::CALLBACK`] or [`TaskPriorityLevel::NOTIFY`] for their notification functions. Applications and drivers may also use
+	/// [`TaskPriorityLevel::NOTIFY`] to protect data structures in critical sections of code.
 	///
-	/// The caller must restore the task priority level with [`BootServices::restoretpl`] to the previous level before
+	/// The caller must restore the task priority level with [`BootServices::restore_tpl`] to the previous level before
 	/// returning.
 	///
 	/// # Safety
 	///
 	/// If NewTpl is below the current [`TaskPriorityLevel`] level, then the system behavior is indeterminate. Additionally, only
-	/// [`TaskPriorityLevel::Application`], [`TaskPriorityLevel::Callback`], [`TaskPriorityLevel::Notify`], and [`TaskPriorityLevel::HighLevel`] may be used. All other values
+	/// [`TaskPriorityLevel::APPLICATION`], [`TaskPriorityLevel::CALLBACK`], [`TaskPriorityLevel::NOTIFY`], and [`TaskPriorityLevel::HIGH_LEVEL`] may be used. All other values
 	/// are reserved for use by the firmware; using them will result in unpredictable behavior. Good coding practice dictates
-	/// that all code should execute at its lowest possible [`TaskPriorityLevel`] level, and the use of [`TaskPriorityLevel`] levels above [`TaskPriorityLevel::Application`] must be minimized.
-	/// Executing at [`TaskPriorityLevel`] levels above [`TaskPriorityLevel::Application`] for extended periods of time may also result in unpredictable behavior.
+	/// that all code should execute at its lowest possible [`TaskPriorityLevel`] level, and the use of [`TaskPriorityLevel`] levels above [`TaskPriorityLevel::APPLICATION`] must be minimized.
+	/// Executing at [`TaskPriorityLevel`] levels above [`TaskPriorityLevel::APPLICATION`] for extended periods of time may also result in unpredictable behavior.
 	///
 	/// # Status Codes Returned
 	///
 	/// Unlike other UEFI interface functions, this function does not return a status code. Instead, it
-	/// returns the previous task priority level, which is to be restored later with a matching call to [`BootServices::restoretpl`].
+	/// returns the previous task priority level, which is to be restored later with a matching call to [`BootServices::restore_tpl`].
 	pub unsafe fn raise_tpl(&self, newtpl: TaskPriorityLevel) -> TaskPriorityLevel {
 		// SAFETY:
 		// todo
@@ -239,10 +239,10 @@ impl BootServices {
 	/// # Safety
 	///
 	/// If OldTpl is above the current [`TaskPriorityLevel`] level, then the system behavior is indeterminate. Additionally, only
-	/// [`TaskPriorityLevel::Application`], [`TaskPriorityLevel::Callback`], [`TaskPriorityLevel::Notify`], and [`TaskPriorityLevel::HighLevel`] *may be used*. All other values
+	/// [`TaskPriorityLevel::APPLICATION`], [`TaskPriorityLevel::CALLBACK`], [`TaskPriorityLevel::NOTIFY`], and [`TaskPriorityLevel::HIGH_LEVEL`] *may be used*. All other values
 	/// are reserved for use by the firmware; using them will result in unpredictable behavior. Good coding practice dictates
-	/// that all code should execute at its lowest possible [`TaskPriorityLevel`] level, and the use of [`TaskPriorityLevel`] levels above [`TaskPriorityLevel::Application`] must be minimized.
-	/// Executing at [`TaskPriorityLevel`] levels above [`TaskPriorityLevel::Application`] for extended periods of time may also result in unpredictable behavior.
+	/// that all code should execute at its lowest possible [`TaskPriorityLevel`] level, and the use of [`TaskPriorityLevel`] levels above [`TaskPriorityLevel::APPLICATION`] must be minimized.
+	/// Executing at [`TaskPriorityLevel`] levels above [`TaskPriorityLevel::APPLICATION`] for extended periods of time may also result in unpredictable behavior.
 	///
 	/// # Status Codes Returned
 	///
@@ -342,7 +342,7 @@ pub struct RuntimeServices {
 	pub update_capsule: unsafe extern "efiapi" fn(capsuleheaderarray: *const *const CapsuleHeader, capsulecount: usize, scattergatherlist: PhysicalAddress) -> Status,
 	/// capsuleheaderarray: IN, capsulecount: IN, maximumcapsulesize: OUT, resettype: OUT
 	pub query_capsule_capabilities: unsafe extern "efiapi" fn(capsuleheaderarray: *const *const CapsuleHeader, capsulecount: usize, maximumcapsulesize: *mut u64, resettype: *mut ResetType) -> Status,
-	// attributes: IN, maxvariablestoragesize: OUT, remainingvariablestoragesize: OUT, maxvariablesize: OUT
+	/// attributes: IN, maxvariablestoragesize: OUT, remainingvariablestoragesize: OUT, maxvariablesize: OUT
 	pub query_variable_info: unsafe extern "efiapi" fn(attributes: u32, maxvariablestoragesize: *mut u64, remainingvariablestoragesize: *mut u64, maxvariablesize: *mut u64) -> Status,
 }
 impl RuntimeServices {

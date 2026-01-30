@@ -1,5 +1,8 @@
 #![no_std]
 #![deny(clippy::undocumented_unsafe_blocks)]
+// #![warn(missing_docs)]
+//! # ACPI
+//! Library for interfacing with the ACPI specification
 
 #[repr(C)]
 pub struct SystemDescriptionTableHeader {
