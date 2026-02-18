@@ -19,7 +19,10 @@ pub mod status;
 mod strings;
 pub mod tables;
 
-use core::ffi::c_char;
+use core::{
+	ffi::c_char,
+	fmt::Display,
+};
 
 pub use chars::Char16;
 pub use strings::CStr16;
@@ -198,7 +201,7 @@ pub struct EFIBlockTranslationTableFlog {
 /// and the last 2 fields as big endian byte sequences there are practically
 /// only 4 fields because of the last 2 big endian fields being combined
 #[repr(C)]
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct GUID {
 	/// little endian byte sequence
 	data1: u32,
@@ -209,6 +212,13 @@ pub struct GUID {
 	/// big endian byte sequence combining last 2 fields (2 bytes then 6 bytes)
 	data4: u64,
 }
+
+impl Display for GUID {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		write!(f, "{:x}-{:x}-{:x}-{:x}", self.data1, self.data2, self.data3, self.data4)
+	}
+}
+
 impl GUID {
 	pub const fn new(data1: u32, data2: u16, data3: u16, data4: u64) -> Self {
 		Self {
@@ -224,7 +234,7 @@ impl GUID {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct PhysicalAddress(u64);
 impl PhysicalAddress {
 	pub const fn new(value: u64) -> Self {
@@ -235,6 +245,18 @@ impl PhysicalAddress {
 	}
 	pub const fn to_ptr<T>(&self) -> *mut T {
 		self.0 as *mut T
+	}
+}
+
+impl core::fmt::LowerHex for PhysicalAddress {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		write!(f, "{:x}", self.0)
+	}
+}
+
+impl core::fmt::UpperHex for PhysicalAddress {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		write!(f, "{:X}", self.0)
 	}
 }
 

@@ -37,6 +37,7 @@ impl PageGlobalDirectoryEntry {
 }
 
 #[repr(C, align(4096))]
+#[derive(Debug)]
 pub struct PageGlobalDirectory {
 	entries: [PageGlobalDirectoryEntry; 512],
 }
@@ -52,22 +53,13 @@ impl PagingStructure for PageGlobalDirectory {
 
 impl PageGlobalDirectory {
 	pub fn get() -> &'static Self {
-		// Safety:
-		// should be safe to get the physical address of PageGlobalDirectory?
-		unsafe {
-			let uefi_cr3 = Self::get_mut();
-			&*uefi_cr3
-		}
-	}
-
-	pub unsafe fn get_mut() -> *mut Self {
 		let uefi_cr3: *mut PageGlobalDirectory;
 		// Safety:
 		// should be safe to get the physical address of PageGlobalDirectory?
 		unsafe {
 			core::arch::asm!("mov {}, cr3", out(reg) uefi_cr3);
+			&*uefi_cr3
 		}
-		uefi_cr3
 	}
 }
 

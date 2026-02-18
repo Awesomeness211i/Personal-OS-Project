@@ -1,8 +1,10 @@
 use core::{
 	error::Error,
 	fmt::{
+		Debug,
 		Display,
 		Formatter,
+		Pointer,
 	},
 	num,
 	ops,
@@ -175,7 +177,7 @@ pub struct ElfHeader {
 }
 
 #[non_exhaustive]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ProgramHeaderType(u32);
 impl ProgramHeaderType {
 	pub const NULL: Self = Self(0);
@@ -185,12 +187,40 @@ impl ProgramHeaderType {
 	pub const NOTE: Self = Self(4);
 	pub const SECTION_HEADER_LIB: Self = Self(5);
 	pub const PROGRAM_HEADER: Self = Self(6);
+	pub const THREAD_LOCAL_STORAGE: Self = Self(7);
+	pub const GNU_EH_FRAME: Self = Self(0x6474e550);
+	pub const GNU_STACK: Self = Self(0x6474e551);
+	pub const GNU_RELRO: Self = Self(0x6474e552);
+	pub const GNU_PROPERTY: Self = Self(0x6474e553);
+	pub const GNU_SFRAME: Self = Self(0x6474e554);
+}
+
+impl Debug for ProgramHeaderType {
+	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+		match *self {
+			Self::NULL => write!(f, "NULL"),
+			Self::LOAD => write!(f, "LOAD"),
+			Self::DYNAMIC => write!(f, "DYNAMIC"),
+			Self::INTERP => write!(f, "INTERP"),
+			Self::NOTE => write!(f, "NOTE"),
+			Self::SECTION_HEADER_LIB => write!(f, "SECTION HEADER LIBRARY"),
+			Self::PROGRAM_HEADER => write!(f, "PROGRAM HEADER"),
+			Self::THREAD_LOCAL_STORAGE => write!(f, "THREAD LOCAL STORAGE"),
+			Self::GNU_EH_FRAME => write!(f, "GNU EH FRAME"),
+			Self::GNU_STACK => write!(f, "GNU STACK"),
+			Self::GNU_RELRO => write!(f, "GNU RELRO"),
+			Self::GNU_PROPERTY => write!(f, "GNU PROPERTY"),
+			Self::GNU_SFRAME => write!(f, "GNU SFRAME"),
+			_ => write!(f, "Unknown: {}", self.0),
+		}
+	}
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct Elf64ProgramHeader {
 	pub p_type: ProgramHeaderType,
-	pub p_flags: u32,
+	pub p_flags: ProgramHeaderFlags,
 	pub p_offset: usize,
 	pub p_vaddr: usize,
 	pub p_paddr: usize,
@@ -201,15 +231,27 @@ pub struct Elf64ProgramHeader {
 
 impl Elf64ProgramHeader {}
 
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProgramHeaderFlags(u32);
+
+impl ProgramHeaderFlags {
+	pub const X: Self = Self(0x1);
+	pub const W: Self = Self(0x2);
+	pub const R: Self = Self(0x4);
+	pub const MASK_OS: Self = Self(0x0FF00000);
+	pub const MASK_PROC: Self = Self(0xF0000000);
+}
+
 #[repr(C)]
 pub struct Elf32ProgramHeader {
-	pub p_type: u32,
+	pub p_type: ProgramHeaderType,
 	pub p_offset: u32,
 	pub p_vaddr: u32,
 	pub p_paddr: u32,
 	pub p_filesz: u32,
 	pub p_memsz: u32,
-	pub p_flags: u32,
+	pub p_flags: ProgramHeaderFlags,
 	pub p_align: u32,
 }
 

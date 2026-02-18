@@ -106,6 +106,7 @@ impl MemoryType {
 /// Can't rely on the static size of this type, you need to query for the descriptor size
 /// using memorymapdata that under the hood uses getmemorymap
 #[repr(C)]
+#[derive(Debug)]
 pub struct MemoryDescriptor {
 	/// Type of memory occupying this range.
 	pub region_type: MemoryType,

@@ -1,4 +1,7 @@
-use core::ffi::c_void;
+use core::{
+	ffi::c_void,
+	fmt::Debug,
+};
 
 use super::{
 	Bool,
@@ -39,6 +42,30 @@ pub struct ConfigurationTable {
 	pub vendor_guid: GUID,
 	pub vendor_table: *const c_void,
 }
+
+impl Debug for ConfigurationTable {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		let s = match self.vendor_guid {
+			Self::EFI_ACPI_20_TABLE => "EFI ACPI 2 TABLE",
+			Self::ACPI_10_TABLE => "ACPI 1 TABLE",
+			Self::SAL_SYSTEM_TABLE => "SAL SYSTEM TABLE",
+			Self::SMBIOS_TABLE => "SMBIOS TABLE",
+			Self::SMBIOS3_TABLE => "SMBIOS3 TABLE",
+			Self::MPS_TABLE => "MPS TABLE",
+			Self::LZMA_FILESYSTEM => "LZMA FILESYSTEM",
+			Self::DXE_SERVICES => "DXE SERVICES",
+			Self::HANDOFF_BLOCK_LIST => "HANDOFF BLOCK LIST",
+			Self::MEMORY_TYPE_INFO_TABLE => "MEMORY TYPE INFO TABLE",
+			Self::MEMORY_STATUS_CODE_RECORD => "MEMORY STATUS CODE RECORD",
+			MemoryAttributesTable::GUID => "UEFI MEMORY ATTRIBUTES TABLE",
+			SystemResourceTable::GUID => "EFI SYSTEM RESOURCE TABLE",
+			DebugImageInfoTable::GUID => "DEBUG IMAGE INFO TABLE",
+			other => format_args!("Unknown {{{other}}}").as_str().unwrap(),
+		};
+		write!(f, "ConfigurationTable {{ vendor_guid: {}, vendor_table: {:X?} }}", s, self.vendor_table)
+	}
+}
+
 impl ConfigurationTable {
 	/// GUID: 8868E871-E4F1-11D3-BC22-0080C73C8881
 	pub const EFI_ACPI_20_TABLE: GUID = GUID::new(0x8868E871, 0xE4F1, 0x11D3, 0xBC22_0080C73C8881);
