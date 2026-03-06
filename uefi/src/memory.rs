@@ -1,3 +1,5 @@
+use core::fmt::Debug;
+
 use super::{
 	PhysicalAddress,
 	VirtualAddress,
@@ -6,6 +8,7 @@ use super::{
 #[repr(transparent)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct Attribute(u64);
+
 impl Attribute {
 	/// Supports memory region being configured to not cacheable.
 	pub const UNCACHEABLE: Self = Self(0x0000000000000001);
@@ -69,8 +72,34 @@ impl Attribute {
 /// use. MemoryType values in the range 0x80000000..0xFFFFFFFF are reserved for use by UEFI OS loaders that
 /// are provided by operating system vendors.
 #[repr(transparent)]
-#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct MemoryType(u32);
+
+impl Debug for MemoryType {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		match *self {
+			Self::RESERVED => write!(f, "RESERVED"),
+			Self::LOADER_CODE => write!(f, "LOADER CODE"),
+			Self::LOADER_DATA => write!(f, "LOADER DATA"),
+			Self::BOOT_SERVICES_CODE => write!(f, "BOOT SERVICES CODE"),
+			Self::BOOT_SERVICES_DATA => write!(f, "BOOT SERVICES DATA"),
+			Self::RUNTIME_SERVICES_CODE => write!(f, "RUNTIME SERVICES CODE"),
+			Self::RUNTIME_SERVICES_DATA => write!(f, "RUNTIME SERVICES DATA"),
+			Self::CONVENTIONAL_MEMORY => write!(f, "CONVENTIONAL MEMORY"),
+			Self::UNUSABLE_MEMORY => write!(f, "UNUSABLE MEMORY"),
+			Self::ACPI_RECLAIM_MEMORY => write!(f, "ACPI RECLAIM MEMORY"),
+			Self::ACPI_MEMORY_NVS => write!(f, "ACPI MEMORY NVS"),
+			Self::MEMORY_MAPPED_IO => write!(f, "MEMORY MAPPED IO"),
+			Self::MEMORY_MAPPED_IO_PORT_SPACE => write!(f, "MEMORY MAPPED IO PORT SPACE"),
+			Self::PAL_CODE => write!(f, "PAL CODE"),
+			Self::PERSISTENT_MEMORY => write!(f, "PERSISTENT MEMORY"),
+			Self::UNACCEPTED => write!(f, "PERSISTENT MEMORY"),
+			Self::MAX_TYPE => write!(f, "MAX TYPE"),
+			other => write!(f, "Unknown: {}", other.0),
+		}
+	}
+}
+
 impl MemoryType {
 	pub const RESERVED: Self = Self(0x00);
 	pub const LOADER_CODE: Self = Self(0x01);

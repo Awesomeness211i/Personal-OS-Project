@@ -233,7 +233,7 @@ impl GUID {
 	}
 }
 
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct PhysicalAddress(u64);
 impl PhysicalAddress {
@@ -260,7 +260,7 @@ impl core::fmt::UpperHex for PhysicalAddress {
 	}
 }
 
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct VirtualAddress(u64);
 impl VirtualAddress {

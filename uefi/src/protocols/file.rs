@@ -92,8 +92,9 @@ pub struct FileProtocol {
 	pub close: unsafe extern "efiapi" fn(this: *const Self) -> Status,
 	/// this: IN
 	pub delete: unsafe extern "efiapi" fn(this: *const Self) -> Status,
-	/// this: IN, buffersize: IN OUT, buffer: OUT
-	pub read: unsafe extern "efiapi" fn(this: *const Self, buffersize: *mut usize, buffer: *mut c_void) -> Status,
+	/// this: IN, buffer_size: IN OUT, buffer: OUT
+	/// On input the buffer_size is the size to write and on output is the number of bytes written
+	pub read: unsafe extern "efiapi" fn(this: *const Self, buffer_size: *mut usize, buffer: *mut c_void) -> Status,
 	/// this: IN, buffersize: IN OUT, buffer: IN
 	pub write: unsafe extern "efiapi" fn(this: *const Self, buffersize: *mut usize, buffer: *const c_void) -> Status,
 	/// this: IN, position: OUT

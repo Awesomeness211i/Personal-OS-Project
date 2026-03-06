@@ -4,7 +4,6 @@ use core::{
 		Debug,
 		Display,
 		Formatter,
-		Pointer,
 	},
 	num,
 	ops,
@@ -105,8 +104,22 @@ impl Elf<'_> {
 }
 
 #[repr(transparent)]
-#[derive(PartialEq, Eq)]
+#[derive(Default, PartialEq, Eq)]
 pub struct ExecutableType(u16);
+
+impl Debug for ExecutableType {
+	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+		match *self {
+			Self::NONE => write!(f, "NONE"),
+			Self::RELOCATABLE => write!(f, "RELOCATABLE"),
+			Self::EXECUTABLE => write!(f, "EXECUTABLE"),
+			Self::DYNAMIC => write!(f, "DYNAMIC"),
+			Self::CORE => write!(f, "CORE"),
+			_ => write!(f, "Unknown: {:#X}", self.0),
+		}
+	}
+}
+
 impl ExecutableType {
 	pub const NONE: Self = Self(0x00);
 	pub const RELOCATABLE: Self = Self(0x01);
@@ -118,8 +131,32 @@ impl ExecutableType {
 }
 
 #[repr(transparent)]
-#[derive(PartialEq, Eq)]
+#[derive(Default, PartialEq, Eq)]
 pub struct Machine(u16);
+
+impl Debug for Machine {
+	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+		match *self {
+			Self::NONE => write!(f, "NONE"),
+			Self::M32 => write!(f, "M32"),
+			Self::SPARC => write!(f, "SPARC"),
+			Self::I386 => write!(f, "I386"),
+			Self::M68K => write!(f, "M68K"),
+			Self::M88K => write!(f, "M88K"),
+			Self::IAMCU => write!(f, "IAMCU"),
+			Self::I860 => write!(f, "I860"),
+			Self::X86_64 => write!(f, "X86_64"),
+			Self::Z80 => write!(f, "Z80"),
+			Self::VISIUM => write!(f, "VISIUM"),
+			Self::FT32 => write!(f, "FT32"),
+			Self::MOXIE => write!(f, "MOXIE"),
+			Self::AMDGPU => write!(f, "AMDGPU"),
+			Self::RISCV => write!(f, "RISCV"),
+			_ => write!(f, "Unknown: {:#X}", self.0),
+		}
+	}
+}
+
 impl Machine {
 	pub const NONE: Self = Self(0x00);
 	pub const M32: Self = Self(0x01);
@@ -141,6 +178,7 @@ impl Machine {
 }
 
 #[repr(C)]
+#[derive(Debug, Default)]
 pub struct ElfHeader {
 	/// e_ident:
 	pub identifier: [u8; 16],
@@ -176,8 +214,61 @@ pub struct ElfHeader {
 	pub section_header_string_index: Option<num::NonZeroU16>,
 }
 
+impl ElfHeader {
+	pub fn is_supported_and_valid(&self) -> bool {
+		if self.identifier[..4] != *b"\x7FELF"
+		/* magic */
+		{
+			return false;
+		}
+		if self.identifier[4] != 2
+		/* 64 bit */
+		{
+			return false;
+		}
+		if self.identifier[5] != 1
+		/* little endian */
+		{
+			return false;
+		}
+		if self.identifier[6] != 1
+		/* elf version */
+		{
+			return false;
+		}
+		if self.identifier[7] != 0
+		/* system v */
+		{
+			return false;
+		}
+		if self.identifier[8] != 0
+		/* abi version */
+		{
+			return false;
+		}
+		if self.identifier[9..] != *b"\x00\x00\x00\x00\x00\x00\x00"
+		/* padding */
+		{
+			return false;
+		}
+		if self.executable_type != ExecutableType::EXECUTABLE {
+			return false;
+		}
+		if self.machine != Machine::X86_64 {
+			return false;
+		}
+		if self.version != 1 {
+			return false;
+		}
+		if self.elf_header_size as usize != size_of::<ElfHeader>() {
+			return false;
+		}
+		true
+	}
+}
+
 #[non_exhaustive]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct ProgramHeaderType(u32);
 impl ProgramHeaderType {
 	pub const NULL: Self = Self(0);
@@ -211,13 +302,38 @@ impl Debug for ProgramHeaderType {
 			Self::GNU_RELRO => write!(f, "GNU RELRO"),
 			Self::GNU_PROPERTY => write!(f, "GNU PROPERTY"),
 			Self::GNU_SFRAME => write!(f, "GNU SFRAME"),
-			_ => write!(f, "Unknown: {}", self.0),
+			_ => write!(f, "Unknown: {:#X}", self.0),
 		}
 	}
 }
 
+#[repr(transparent)]
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub struct ProgramHeaderFlags(u32);
+
+impl Debug for ProgramHeaderFlags {
+	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+		let none = '-';
+		let r = if self.0 & Self::R.0 != 0 { 'r' } else { none };
+		let w = if self.0 & Self::W.0 != 0 { 'w' } else { none };
+		let x = if self.0 & Self::X.0 != 0 { 'x' } else { none };
+		write!(f, "{r}{w}{x}: {:#X}", self.0)
+	}
+}
+
+impl ProgramHeaderFlags {
+	pub const X: Self = Self(0x1);
+	pub const W: Self = Self(0x2);
+	pub const R: Self = Self(0x4);
+	pub const MASK_OS: Self = Self(0x0FF00000);
+	pub const MASK_PROC: Self = Self(0xF0000000);
+	pub fn get(&self) -> u32 {
+		self.0
+	}
+}
+
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Elf64ProgramHeader {
 	pub p_type: ProgramHeaderType,
 	pub p_flags: ProgramHeaderFlags,
@@ -231,19 +347,8 @@ pub struct Elf64ProgramHeader {
 
 impl Elf64ProgramHeader {}
 
-#[repr(transparent)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ProgramHeaderFlags(u32);
-
-impl ProgramHeaderFlags {
-	pub const X: Self = Self(0x1);
-	pub const W: Self = Self(0x2);
-	pub const R: Self = Self(0x4);
-	pub const MASK_OS: Self = Self(0x0FF00000);
-	pub const MASK_PROC: Self = Self(0xF0000000);
-}
-
 #[repr(C)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Elf32ProgramHeader {
 	pub p_type: ProgramHeaderType,
 	pub p_offset: u32,
@@ -258,7 +363,34 @@ pub struct Elf32ProgramHeader {
 impl Elf32ProgramHeader {}
 
 #[repr(transparent)]
+#[derive(Default, PartialEq, Eq)]
 pub struct SectionHeaderType(u32);
+
+impl Debug for SectionHeaderType {
+	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+		match *self {
+			Self::NULL => write!(f, "NULL"),
+			Self::PROGRAM_BITS => write!(f, "PROGRAM BITS"),
+			Self::SYMBOL_TABLE => write!(f, "SYMBOL TABLE"),
+			Self::STRING_TABLE => write!(f, "STRING TABLE"),
+			Self::RELOCATION_ADDENDS => write!(f, "RELOCATION ADDENDS"),
+			Self::HASH => write!(f, "HASH"),
+			Self::DYNAMIC => write!(f, "DYNAMIC"),
+			Self::NOTE => write!(f, "NOTE"),
+			Self::NO_BITS => write!(f, "NO BITS"),
+			Self::RELOCATION => write!(f, "RELOCATION"),
+			Self::LIB => write!(f, "LIB"),
+			Self::DYNAMIC_SYMBOLS => write!(f, "DYNAMIC SYMBOLS"),
+			Self::INITIZATION_ARRAY => write!(f, "INITIZATION ARRAY"),
+			Self::PREINITITIALIZATION_ARRAY => write!(f, "PREINITITIALIZATION ARRAY"),
+			Self::GROUP => write!(f, "GROUP"),
+			Self::SYMBOL_TABLE_SECTION_HEADER_INDEX => write!(f, "SYMBOL TABLE SECTION HEADER INDEX"),
+			Self::SHT_GNU_HASH => write!(f, "SHT GNU HASH"),
+			_ => write!(f, "Unknown: {:#X}", self.0),
+		}
+	}
+}
+
 impl SectionHeaderType {
 	pub const NULL: Self = Self(0x00000000);
 	pub const PROGRAM_BITS: Self = Self(0x00000001);
@@ -277,12 +409,14 @@ impl SectionHeaderType {
 	pub const PREINITITIALIZATION_ARRAY: Self = Self(0x00000010);
 	pub const GROUP: Self = Self(0x00000011);
 	pub const SYMBOL_TABLE_SECTION_HEADER_INDEX: Self = Self(0x00000012);
+	pub const SHT_GNU_HASH: Self = Self(0x6FFFFFF6);
 	pub const OS_SPECIFIC: ops::RangeInclusive<Self> = Self(0x60000000)..=Self(0x6fffffff);
 	pub const PROCESSOR_SPECIFIC: ops::RangeInclusive<Self> = Self(0x70000000)..=Self(0x7fffffff);
 	pub const APPLICATION_SPECIFIC: ops::RangeInclusive<Self> = Self(0x80000000)..=Self(0xffffffff);
 }
 
 #[repr(C)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Elf64SectionHeader {
 	/// Index into section header string table
 	pub name: u32,
@@ -305,6 +439,7 @@ pub struct Elf64SectionHeader {
 }
 
 #[repr(C)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Elf32SectionHeader {
 	/// Index into section header string table
 	pub name: u32,

@@ -21,6 +21,7 @@ pub struct MappingInfo {
 	pub len: usize,
 }
 
+#[repr(C)]
 pub struct KernelDataHeader {
 	/// size of structure in bytes
 	pub graphics_len: usize,

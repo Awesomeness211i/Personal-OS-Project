@@ -22,12 +22,6 @@ dependencies = [
 [[package]]
 name = "kernel"
 version = "0.1.0"
-dependencies = [
- "acpi",
- "arch",
- "bootloader",
- "uefi",
-]
 
 [[package]]
 name = "operating_system"

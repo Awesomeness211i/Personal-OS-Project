@@ -11,7 +11,7 @@ pub trait PagingStructure {
 const PHYSICAL_ADDRESS: u64 = 0x000FFFFFFFFFF000;
 
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct PageGlobalDirectoryEntry(u64);
 impl PagingElement for PageGlobalDirectoryEntry {
 	fn exists(&self) -> bool {
@@ -24,8 +24,9 @@ impl PageGlobalDirectoryEntry {
 		Self(entry)
 	}
 
-	pub const fn to_addr(&self) -> *mut PageUpperDirectory {
-		(self.0 & PHYSICAL_ADDRESS) as *mut PageUpperDirectory
+	pub const fn to_addr(&mut self) -> &mut PageUpperDirectory {
+		// # Safety:
+		unsafe { &mut *((self.0 & PHYSICAL_ADDRESS) as *mut PageUpperDirectory) }
 	}
 	pub const PRESENT: u64 = 0x1;
 	pub const READ_WRITE: u64 = 0x2;
@@ -52,6 +53,9 @@ impl PagingStructure for PageGlobalDirectory {
 }
 
 impl PageGlobalDirectory {
+	pub const fn new(entries: [PageGlobalDirectoryEntry; 512]) -> Self {
+		Self { entries }
+	}
 	pub fn get() -> &'static Self {
 		let uefi_cr3: *mut PageGlobalDirectory;
 		// Safety:
@@ -64,7 +68,7 @@ impl PageGlobalDirectory {
 }
 
 #[repr(transparent)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct PageUpperDirectoryEntry(u64);
 impl PagingElement for PageUpperDirectoryEntry {
 	fn exists(&self) -> bool {
@@ -76,8 +80,9 @@ impl PageUpperDirectoryEntry {
 	pub unsafe fn new(entry: u64) -> Self {
 		Self(entry)
 	}
-	pub const fn to_addr(&self) -> *mut PageMiddleDirectory {
-		(self.0 & PHYSICAL_ADDRESS) as *mut PageMiddleDirectory
+	pub const fn to_addr(&mut self) -> &mut PageMiddleDirectory {
+		// # Safety:
+		unsafe { &mut *((self.0 & PHYSICAL_ADDRESS) as *mut PageMiddleDirectory) }
 	}
 	pub const PRESENT: u64 = 0x1;
 	pub const READ_WRITE: u64 = 0x2;
@@ -90,7 +95,7 @@ impl PageUpperDirectoryEntry {
 }
 
 #[repr(C, align(4096))]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PageUpperDirectory {
 	entries: [PageUpperDirectoryEntry; 512],
 }
@@ -105,7 +110,7 @@ impl PagingStructure for PageUpperDirectory {
 }
 
 #[repr(transparent)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct PageMiddleDirectoryEntry(u64);
 impl PagingElement for PageMiddleDirectoryEntry {
 	fn exists(&self) -> bool {
@@ -117,8 +122,9 @@ impl PageMiddleDirectoryEntry {
 	pub unsafe fn new(entry: u64) -> Self {
 		Self(entry)
 	}
-	pub const fn to_addr(&self) -> *mut PageTable {
-		(self.0 & PHYSICAL_ADDRESS) as *mut PageTable
+	pub const fn to_addr(&mut self) -> &mut PageTable {
+		// # Safety:
+		unsafe { &mut *((self.0 & PHYSICAL_ADDRESS) as *mut PageTable) }
 	}
 	pub const PRESENT: u64 = 0x1;
 	pub const READ_WRITE: u64 = 0x2;
@@ -131,7 +137,7 @@ impl PageMiddleDirectoryEntry {
 }
 
 #[repr(C, align(4096))]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PageMiddleDirectory {
 	entries: [PageMiddleDirectoryEntry; 512],
 }
@@ -146,7 +152,7 @@ impl PagingStructure for PageMiddleDirectory {
 }
 
 #[repr(transparent)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct PageTableEntry(u64);
 impl PagingElement for PageTableEntry {
 	fn exists(&self) -> bool {
@@ -175,6 +181,7 @@ impl PageTableEntry {
 }
 
 #[repr(C, align(4096))]
+#[derive(Debug)]
 pub struct PageTable {
 	entries: [PageTableEntry; 512],
 }

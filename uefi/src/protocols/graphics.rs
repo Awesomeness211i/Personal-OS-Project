@@ -1,7 +1,6 @@
 use crate::{
 	GUID,
 	PhysicalAddress,
-
 	status::Status,
 };
 
@@ -29,10 +28,21 @@ impl GraphicsPixelFormat {
 #[repr(C)]
 pub struct GraphicsOutputProtocol {
 	/// this: IN, modenumber: IN, sizeofinfo: OUT, info: OUT
-	pub query_mode: unsafe extern "efiapi" fn(this: *const Self, modenumber: u32, sizeofinfo: *mut usize, info: *const *mut GraphicsOutputModeInformation) -> Status,
+	pub query_mode: unsafe extern "efiapi" fn(this: *const Self, modenumber: u32, sizeofinfo: *mut usize, info: *mut *const GraphicsOutputModeInformation) -> Status,
 	pub set_mode: unsafe extern "efiapi" fn(*const Self, modenumber: u32) -> Status,
 	/// this: IN, buffer: IN OUT, operation: IN, sourcex: IN, sourcey: IN, destx: IN, desty: IN, width: IN, height: IN, delta: IN
-	pub blt: unsafe extern "efiapi" fn(this: *const Self, buffer: *mut GraphicsPixel, operation: GraphicsOutputBLTOperation, sourcex: usize, sourcey: usize, destx: usize, desty: usize, width: usize, height: usize, delta: Option<core::num::NonZeroUsize>) -> Status,
+	pub blt: unsafe extern "efiapi" fn(
+		this: *const Self,
+		buffer: *mut GraphicsPixel,
+		operation: GraphicsOutputBLTOperation,
+		sourcex: usize,
+		sourcey: usize,
+		destx: usize,
+		desty: usize,
+		width: usize,
+		height: usize,
+		delta: Option<core::num::NonZeroUsize>,
+	) -> Status,
 	pub mode: *mut GraphicsOutputProtocolMode,
 }
 impl GraphicsOutputProtocol {
@@ -102,11 +112,6 @@ pub struct GraphicsPixel {
 
 impl GraphicsPixel {
 	pub const fn new(red: u8, green: u8, blue: u8, reserved: u8) -> Self {
-		Self {
-			blue,
-			green,
-			red,
-			reserved
-		}
+		Self { blue, green, red, reserved }
 	}
 }

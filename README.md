@@ -1,1 +1,1 @@
-cargo run --bin qemu
+cargo run
