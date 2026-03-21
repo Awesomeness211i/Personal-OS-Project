@@ -264,8 +264,23 @@ impl core::fmt::UpperHex for PhysicalAddress {
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct VirtualAddress(u64);
 impl VirtualAddress {
+	pub fn new(addr: u64) -> Self {
+		Self(addr)
+	}
 	pub fn get(&self) -> u64 {
 		self.0
+	}
+}
+
+impl core::fmt::LowerHex for VirtualAddress {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		write!(f, "{:x}", self.0)
+	}
+}
+
+impl core::fmt::UpperHex for VirtualAddress {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		write!(f, "{:X}", self.0)
 	}
 }
 

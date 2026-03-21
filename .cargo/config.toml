@@ -1,2 +1,7 @@
+[build]
+rustflags = ["-C", "relocation-model=static", "-C", "code-model=kernel"]
+
 [unstable]
 bindeps = true
+# build-std-features = ["compiler-builtins-mem"]
+# build-std = ["core"]

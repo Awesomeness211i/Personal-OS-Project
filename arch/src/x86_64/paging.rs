@@ -1,196 +1,123 @@
-pub trait PagingElement {
-	fn exists(&self) -> bool;
-}
+use core::{
+	fmt::{
+		LowerHex,
+		UpperHex,
+	},
+	ops::{
+		BitAnd,
+		BitOr,
+	},
+};
 
-pub trait PagingStructure {
-	type EntryType: PagingElement;
-	fn entries(&self) -> &[Self::EntryType];
-	unsafe fn get_entries(&mut self) -> &mut [Self::EntryType];
+pub enum EntrySize {
+	FourKiB,
+	TwoMiB,
+	OneGiB,
 }
-
-const PHYSICAL_ADDRESS: u64 = 0x000FFFFFFFFFF000;
 
 #[repr(transparent)]
-#[derive(Debug, Clone)]
-pub struct PageGlobalDirectoryEntry(u64);
-impl PagingElement for PageGlobalDirectoryEntry {
-	fn exists(&self) -> bool {
-		self.0 & Self::PRESENT != 0
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct EntryFlags(u64);
+
+impl EntryFlags {
+	pub const fn get(&self) -> u64 {
+		self.0
+	}
+	pub const NONE: Self = Self(0x00);
+
+	/// Present in all entry types
+	pub const PRESENT: Self = Self(0x1);
+	/// Present in all entry types
+	pub const READ_WRITE: Self = Self(0x2);
+	/// Present in all entry types
+	pub const USER_ACCESSIBLE: Self = Self(0x4);
+	/// Present in all entry types
+	pub const WRITE_THROUGH: Self = Self(0x8);
+	/// Present in all entry types
+	pub const PAGE_CACHE_DISABLE: Self = Self(0x10);
+	/// Present in all entry types
+	pub const ACCESSED: Self = Self(0x20);
+
+	pub const DIRTY: Self = Self(0x40);
+
+	/// This bit is only in the PDPE and PDE
+	pub const PAGE_SIZE: Self = Self(0x80);
+
+	pub const PAGE_ATTRIBUTE_TABLE: Self = Self(0x80);
+	pub const GLOBAL: Self = Self(0x100);
+	pub const MEMORY_PROTECTION_KEY: Self = Self(0x7800_0000_0000_0000);
+	pub const NOT_EXECUTABLE: Self = Self(0x8000_0000_0000_0000);
+}
+
+impl LowerHex for EntryFlags {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		write!(f, "{:x}", self.0)
 	}
 }
 
-impl PageGlobalDirectoryEntry {
+impl UpperHex for EntryFlags {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		write!(f, "{:X}", self.0)
+	}
+}
+
+impl BitAnd for EntryFlags {
+	type Output = Self;
+	fn bitand(self, rhs: Self) -> Self::Output {
+		Self(self.0 & rhs.0)
+	}
+}
+
+impl BitOr for EntryFlags {
+	type Output = Self;
+	fn bitor(self, rhs: Self) -> Self::Output {
+		Self(self.0 | rhs.0)
+	}
+}
+
+#[repr(transparent)]
+#[derive(Debug, Clone)]
+pub struct Entry(u64);
+
+impl Entry {
 	pub unsafe fn new(entry: u64) -> Self {
 		Self(entry)
 	}
 
-	pub const fn to_addr(&mut self) -> &mut PageUpperDirectory {
-		// # Safety:
-		unsafe { &mut *((self.0 & PHYSICAL_ADDRESS) as *mut PageUpperDirectory) }
+	pub fn exists(&self) -> bool {
+		self.0 & EntryFlags::PRESENT.0 != 0
 	}
-	pub const PRESENT: u64 = 0x1;
-	pub const READ_WRITE: u64 = 0x2;
-	pub const USER_ACCESSIBLE: u64 = 0x4;
-	pub const WRITE_THROUGH: u64 = 0x8;
-	pub const PAGE_CACHE_DISABLE: u64 = 0x10;
-	pub const ACCESSED: u64 = 0x20;
-	pub const NOT_EXECUTABLE: u64 = 0x8000000000000000;
+
+	pub fn get_flags(&self) -> EntryFlags {
+		EntryFlags(self.0 & !Self::PHYSICAL_ADDRESS)
+	}
+
+	pub const fn to_addr(&mut self) -> &mut Table {
+		// # Safety:
+		unsafe { &mut *((self.0 & Self::PHYSICAL_ADDRESS) as *mut Table) }
+	}
+
+	const PHYSICAL_ADDRESS: u64 = 0x000FFFFFFFFFF000;
 }
 
 #[repr(C, align(4096))]
 #[derive(Debug)]
-pub struct PageGlobalDirectory {
-	entries: [PageGlobalDirectoryEntry; 512],
+pub struct Table<const ENTRY_NUM: usize = 512> {
+	entries: [Entry; ENTRY_NUM],
 }
-impl PagingStructure for PageGlobalDirectory {
-	type EntryType = PageGlobalDirectoryEntry;
-	fn entries(&self) -> &[Self::EntryType] {
+
+impl<const ENTRY_NUM: usize> Table<ENTRY_NUM> {
+	pub fn entries(&self) -> &[Entry] {
 		&self.entries
 	}
-	unsafe fn get_entries(&mut self) -> &mut [Self::EntryType] {
+
+	pub unsafe fn get_entries(&mut self) -> &mut [Entry] {
 		&mut self.entries
 	}
-}
-
-impl PageGlobalDirectory {
-	pub const fn new(entries: [PageGlobalDirectoryEntry; 512]) -> Self {
-		Self { entries }
-	}
-	pub fn get() -> &'static Self {
-		let uefi_cr3: *mut PageGlobalDirectory;
-		// Safety:
-		// should be safe to get the physical address of PageGlobalDirectory?
-		unsafe {
-			core::arch::asm!("mov {}, cr3", out(reg) uefi_cr3);
-			&*uefi_cr3
-		}
-	}
-}
-
-#[repr(transparent)]
-#[derive(Debug, Clone)]
-pub struct PageUpperDirectoryEntry(u64);
-impl PagingElement for PageUpperDirectoryEntry {
-	fn exists(&self) -> bool {
-		self.0 & Self::PRESENT != 0
-	}
-}
-
-impl PageUpperDirectoryEntry {
-	pub unsafe fn new(entry: u64) -> Self {
-		Self(entry)
-	}
-	pub const fn to_addr(&mut self) -> &mut PageMiddleDirectory {
-		// # Safety:
-		unsafe { &mut *((self.0 & PHYSICAL_ADDRESS) as *mut PageMiddleDirectory) }
-	}
-	pub const PRESENT: u64 = 0x1;
-	pub const READ_WRITE: u64 = 0x2;
-	pub const USER_ACCESSIBLE: u64 = 0x4;
-	pub const WRITE_THROUGH: u64 = 0x8;
-	pub const PAGE_CACHE_DISABLE: u64 = 0x10;
-	pub const ACCESSED: u64 = 0x20;
-	pub const PAGE_SIZE: u64 = 0x80;
-	pub const NOT_EXECUTABLE: u64 = 0x8000000000000000;
-}
-
-#[repr(C, align(4096))]
-#[derive(Debug, Clone)]
-pub struct PageUpperDirectory {
-	entries: [PageUpperDirectoryEntry; 512],
-}
-impl PagingStructure for PageUpperDirectory {
-	type EntryType = PageUpperDirectoryEntry;
-	fn entries(&self) -> &[Self::EntryType] {
-		&self.entries
-	}
-	unsafe fn get_entries(&mut self) -> &mut [Self::EntryType] {
-		&mut self.entries
-	}
-}
-
-#[repr(transparent)]
-#[derive(Debug, Clone)]
-pub struct PageMiddleDirectoryEntry(u64);
-impl PagingElement for PageMiddleDirectoryEntry {
-	fn exists(&self) -> bool {
-		self.0 & Self::PRESENT != 0
-	}
-}
-
-impl PageMiddleDirectoryEntry {
-	pub unsafe fn new(entry: u64) -> Self {
-		Self(entry)
-	}
-	pub const fn to_addr(&mut self) -> &mut PageTable {
-		// # Safety:
-		unsafe { &mut *((self.0 & PHYSICAL_ADDRESS) as *mut PageTable) }
-	}
-	pub const PRESENT: u64 = 0x1;
-	pub const READ_WRITE: u64 = 0x2;
-	pub const USER_ACCESSIBLE: u64 = 0x4;
-	pub const WRITE_THROUGH: u64 = 0x8;
-	pub const PAGE_CACHE_DISABLE: u64 = 0x10;
-	pub const ACCESSED: u64 = 0x20;
-	pub const PAGE_SIZE: u64 = 0x80;
-	pub const NOT_EXECUTABLE: u64 = 0x8000000000000000;
-}
-
-#[repr(C, align(4096))]
-#[derive(Debug, Clone)]
-pub struct PageMiddleDirectory {
-	entries: [PageMiddleDirectoryEntry; 512],
-}
-impl PagingStructure for PageMiddleDirectory {
-	type EntryType = PageMiddleDirectoryEntry;
-	fn entries(&self) -> &[Self::EntryType] {
-		&self.entries
-	}
-	unsafe fn get_entries(&mut self) -> &mut [Self::EntryType] {
-		&mut self.entries
-	}
-}
-
-#[repr(transparent)]
-#[derive(Debug, Clone)]
-pub struct PageTableEntry(u64);
-impl PagingElement for PageTableEntry {
-	fn exists(&self) -> bool {
-		self.0 & Self::PRESENT != 0
-	}
-}
-
-impl PageTableEntry {
-	pub unsafe fn new(entry: u64) -> Self {
-		Self(entry)
-	}
-	pub const fn to_addr(&self) -> u64 {
-		self.0 & PHYSICAL_ADDRESS
-	}
-	pub const PRESENT: u64 = 0x1;
-	pub const READ_WRITE: u64 = 0x2;
-	pub const USER_ACCESSIBLE: u64 = 0x4;
-	pub const WRITE_THROUGH: u64 = 0x8;
-	pub const PAGE_CACHE_DISABLE: u64 = 0x10;
-	pub const ACCESSED: u64 = 0x20;
-	pub const DIRTY: u64 = 0x40;
-	pub const PAGE_ATTRIBUTE_TABLE: u64 = 0x80;
-	pub const GLOBAL: u64 = 0x100;
-	pub const MEMORY_PROTECTION_KEY: u64 = 0x7800000000000000;
-	pub const NOT_EXECUTABLE: u64 = 0x8000000000000000;
 }
 
 #[repr(C, align(4096))]
 #[derive(Debug)]
-pub struct PageTable {
-	entries: [PageTableEntry; 512],
-}
-impl PagingStructure for PageTable {
-	type EntryType = PageTableEntry;
-	fn entries(&self) -> &[Self::EntryType] {
-		&self.entries
-	}
-	unsafe fn get_entries(&mut self) -> &mut [Self::EntryType] {
-		&mut self.entries
-	}
+pub struct Page {
+	entries: [u8; 4096],
 }

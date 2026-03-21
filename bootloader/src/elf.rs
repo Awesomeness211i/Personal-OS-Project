@@ -11,6 +11,8 @@ use core::{
 	slice,
 };
 
+use crate::print::println;
+
 #[derive(Debug)]
 pub enum ELFError {
 	Unknown,
@@ -251,7 +253,8 @@ impl ElfHeader {
 		{
 			return false;
 		}
-		if self.executable_type != ExecutableType::EXECUTABLE {
+		println(format_args!("Executable Type: {:?}", self.executable_type));
+		if !(self.executable_type == ExecutableType::EXECUTABLE || self.executable_type == ExecutableType::DYNAMIC) {
 			return false;
 		}
 		if self.machine != Machine::X86_64 {

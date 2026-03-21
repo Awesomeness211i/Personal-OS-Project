@@ -6,7 +6,7 @@ default-run = "qemu"
 
 [workspace]
 members = ["bootloader", "kernel", "acpi", "arch", "uefi"]
-resolver = "3"
+resolver = "2"
 
 [profile.dev]
 panic = "abort"
@@ -17,9 +17,20 @@ incremental = true
 strip = true
 
 [dependencies]
+
+[build-dependencies]
 bootloader = { path = "bootloader", artifact = "bin", target = "x86_64-unknown-uefi" }
 kernel = { path = "kernel", artifact = "bin", target = "x86_64-unknown-none" }
 
-[build-dependencies]
-
 [dev-dependencies]
+compiler_builtins = "*"
+cfg-if = "*"
+getopts = "*"
+libc = "*"
+hashbrown = "*"
+rustc-demangle = "*"
+hermit-abi = "*"
+dlmalloc = "*"
+wasi = "*"
+fortanix-sgx-abi = "*"
+cc = "*"

@@ -1,5 +1,5 @@
-#![no_std]
 #![deny(clippy::undocumented_unsafe_blocks)]
+#![no_std]
 // #![warn(missing_docs)]
 //! # ARCH
 //! Library for interfacing with the cpu architecture specific features that I want to support for

@@ -1,5 +1,4 @@
-#![feature(unwrap_infallible, custom_test_frameworks)]
-// #![test_runner(crate::test_runner)]
+#![feature(unwrap_infallible)]
 // #![warn(missing_docs)]
 #![no_main]
 #![no_std]
@@ -9,25 +8,21 @@
 use core::{
 	self,
 	ffi::c_void,
-	fmt::{
-		Error,
-		Write,
-	},
+	ops::Index,
 	panic,
 	ptr,
 	slice,
 };
 
-use arch::x86_64::paging::{
-	PageGlobalDirectory,
-	PageGlobalDirectoryEntry,
-	PageMiddleDirectoryEntry,
-	PageTableEntry,
-	PageUpperDirectoryEntry,
-	PagingElement,
-	PagingStructure,
-};
+use arch::x86_64::paging::EntryFlags;
 use bootloader::{
+	PAGE_SIZE,
+	SYSTEM_TABLE_POINTER,
+	address_space::{
+		AddressSpace,
+		Page,
+		PageIterator,
+	},
 	boot_info::{
 		self,
 	},
@@ -37,6 +32,10 @@ use bootloader::{
 		ElfHeader,
 		ProgramHeaderFlags,
 		ProgramHeaderType,
+	},
+	print::{
+		Port,
+		println,
 	},
 };
 use uefi::{
@@ -74,109 +73,6 @@ use uefi::{
 	},
 };
 
-fn println(args: core::fmt::Arguments<'_>) {
-	let mut port = Port::COM1;
-	let _ = writeln!(port, "{args}");
-}
-
-fn print(args: core::fmt::Arguments<'_>) {
-	let mut port = Port::COM1;
-	let _ = write!(port, "{args}");
-}
-
-const PAGE_SIZE: usize = 4096;
-
-#[repr(transparent)]
-struct Port(u16);
-
-impl core::fmt::Write for Port {
-	fn write_str(&mut self, s: &str) -> core::fmt::Result {
-		let str = s.as_bytes();
-		let len = str.len();
-		let result = unsafe { self.out_bytes(str) };
-		if result == len { Ok(()) } else { Err(Error) }
-	}
-}
-
-impl Port {
-	pub const COM1: Self = Self(0x3F8);
-	pub const COM2: Self = Self(0x2F8);
-	pub const COM3: Self = Self(0x3E8);
-	pub const COM4: Self = Self(0x2E8);
-	pub const COM5: Self = Self(0x5F8);
-	pub const COM6: Self = Self(0x4F8);
-	pub const COM7: Self = Self(0x5E8);
-	pub const COM8: Self = Self(0x4E8);
-
-	const RX_TX_BUFFER: u16 = 0;
-	const INT_ENABLE: u16 = 1;
-	const FIFO_CTRL: u16 = 2;
-	const LINE_CTRL: u16 = 3;
-	const MODEM_CTRL: u16 = 4;
-	const LINE_STATUS: u16 = 5;
-	const MODEM_STATUS: u16 = 6;
-	const SCRATCH: u16 = 7;
-
-	pub unsafe fn init(&self) {
-		unsafe {
-			Self(self.0 + Self::INT_ENABLE).out(0x00);
-			Self(self.0 + Self::LINE_CTRL).out(0x80);
-			Self(self.0 + Self::RX_TX_BUFFER).out(0x03);
-
-			Self(self.0 + Self::INT_ENABLE).out(0x00);
-			Self(self.0 + Self::LINE_CTRL).out(0x03);
-			Self(self.0 + Self::FIFO_CTRL).out(0x07);
-			Self(self.0 + Self::MODEM_CTRL).out(0x1F);
-
-			Self(self.0 + Self::RX_TX_BUFFER).out(0xAA);
-
-			if Self::inb(self) != 0xAA {
-				println(format_args!("Error: port not setup correctly"));
-			}
-
-			Self(self.0 + Self::MODEM_CTRL).out(0x0F);
-		}
-	}
-
-	#[inline(always)]
-	unsafe fn out(&self, value: u8) {
-		unsafe {
-			core::arch::asm!(
-				"out dx, al",
-				in("dx") self.0,
-				in("al") value,
-			)
-		}
-	}
-
-	#[inline(always)]
-	unsafe fn inb(&self) -> u8 {
-		let value: u8;
-		unsafe {
-			core::arch::asm!(
-				"in al, dx",
-				in("dx") self.0,
-				out("al") value,
-			)
-		}
-		value
-	}
-
-	#[inline(always)]
-	unsafe fn out_bytes(&self, bytes: &[u8]) -> usize {
-		let unwritten_bytes: usize;
-		unsafe {
-			core::arch::asm!(
-				"rep outsb",
-				inout("rcx") bytes.len() => unwritten_bytes,
-				in("dx") self.0,
-				inout("rsi") bytes.as_ptr() => _,
-			);
-		}
-		bytes.len() - unwritten_bytes
-	}
-}
-
 fn read_file<T: Default>(file: *const FileProtocol, offset: u64) -> T {
 	let mut pos = 0;
 	let mut header = T::default();
@@ -196,8 +92,6 @@ fn read_file<T: Default>(file: *const FileProtocol, offset: u64) -> T {
 	header
 }
 
-static mut SYSTEM_TABLE_POINTER: Option<SystemTablePointer> = None;
-
 /// image: IN, system_table: IN
 #[unsafe(export_name = "efi_main")]
 pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTablePointer) -> Status {
@@ -214,89 +108,6 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 	unsafe { ((*system_table.console_out).reset)(system_table.console_out, true) };
 	unsafe { ((*system_table.std_err).reset)(system_table.std_err, true) };
 	unsafe { ((*system_table.console_in).reset)(system_table.console_in, true) };
-
-	let address_space = AddressSpace::create(4);
-	let _ = address_space;
-	// println(format_args!("{address_space:#?}"));
-	// address_space.mmap(, , );
-
-	// Model specific extensions register
-	// Can use CPUID to query support for feature except for performance counter extensions
-	// let model_specific_features = [
-	// 	"VME,",
-	// 	"PVI,",
-	// 	"TSD,",
-	// 	"DE,",
-	// 	"PSE,", // bit 4
-	// 	"PAE,", // bit 5
-	// 	"MCE,",
-	// 	"PGE,", // bit 7
-	// 	"PCE,",
-	// 	"OSFXSR,",     // bit 9
-	// 	"OSXMMEXCPT,", // bit 10
-	// 	"UMIP,",
-	// 	"LA57,", // bit 12
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"FSGSBASE,",
-	// 	"PCIDE,", // bit 17
-	// 	"OSXSAVE,",
-	// 	"RESERVED,",
-	// 	"SMEP,", // bit 20
-	// 	"SMAP,", // bit 21
-	// 	"PKE,",  // bit 22
-	// 	"CET,",  // bit 23
-	// 	"PKS,",  // bit 24
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// ];
-	// let cr4: u64;
-	// unsafe { core::arch::asm!("mov {}, cr4", out(reg) cr4) };
-	// print(format_args!("CR4: "));
-	// for (i, string) in model_specific_features.iter().enumerate() {
-	// 	if cr4 & (1 << i) > 0 {
-	// 		print(format_args!("{string}"));
-	// 	}
-	// }
-	// println(format_args!(""));
 
 	let loaded_image = {
 		let mut interface_ptr = ptr::null();
@@ -369,26 +180,7 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 	// 	println(format_args!("{section_header:#?}"));
 	// }
 
-	let page_global_directory_table = {
-		let mut page_table_allocation = PhysicalAddress::new(0);
-		let status = unsafe { ((*system_table.boot_services).allocate_pages)(AllocateType::ANY_PAGES, MemoryType::LOADER_DATA, 1, &mut page_table_allocation) };
-		if status != Status::SUCCESS {
-			panic!("Failed to allocate page table allocation: {status}")
-		}
-		let page_global_directory_table = PageGlobalDirectory::get();
-		println(format_args!("CR3: {:X?}", page_global_directory_table as *const PageGlobalDirectory));
-		let ptr = unsafe {
-			page_table_allocation.to_ptr::<u8>().write_bytes(0, PAGE_SIZE);
-			page_table_allocation.to_ptr::<PageGlobalDirectory>().as_mut_unchecked()
-		};
-		for (i, entry) in page_global_directory_table.entries().iter().enumerate() {
-			unsafe { ptr.get_entries()[i] = entry.clone() };
-		}
-		ptr
-	};
-
-	let high_half_base = 0xFFFF_8000_0000_0000;
-	let index_mask = 0x1FF;
+	let mut address_space = AddressSpace::create(4);
 
 	let mut segments_loaded = 0;
 	let mut pages_loaded = 0;
@@ -398,28 +190,18 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 
 		match program_header.p_type {
 			ProgramHeaderType::LOAD => {
-				let virtual_address = high_half_base | program_header.p_vaddr;
-				let offset = program_header.p_vaddr & 0xFFF;
+				let virtual_address = program_header.p_vaddr;
+				let offset = virtual_address & 0xFFF;
 				let file_offset = program_header.p_offset;
 				let file_size = program_header.p_filesz;
 				let mem_size = program_header.p_memsz;
 				let align = program_header.p_align;
 				let elf_flags = program_header.p_flags;
-				let permissive = PageGlobalDirectoryEntry::PRESENT | PageGlobalDirectoryEntry::READ_WRITE | PageGlobalDirectoryEntry::USER_ACCESSIBLE;
 				let segment_pages = (offset + mem_size).div_ceil(PAGE_SIZE);
 
 				if align > 0 && file_offset % align != virtual_address % align {
 					panic!("Align: {align}");
 				}
-
-				let mut new = virtual_address >> 12;
-				let page_table_index = new & index_mask;
-				new >>= 9;
-				let page_middle_directory_index = new & index_mask;
-				new >>= 9;
-				let page_upper_directory_index = new & index_mask;
-				new >>= 9;
-				let page_global_directory_index = new & index_mask;
 
 				let allocated_address = {
 					let mut address = PhysicalAddress::new(0);
@@ -430,7 +212,6 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 					}
 					address
 				};
-				println(format_args!("Mapping physical address: {allocated_address:#X} to virtual address: {virtual_address:#X}"));
 
 				if program_header.p_vaddr.wrapping_add(mem_size) < program_header.p_vaddr {
 					panic!("ELF address structure overflowed");
@@ -462,80 +243,28 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 				}
 
 				// Mapping page tables
-				let mut page_global_directory_entry = if !page_global_directory_table.entries()[page_global_directory_index].exists() {
-					let mut page_table_allocation = PhysicalAddress::new(0);
-					let status = unsafe { ((*system_table.boot_services).allocate_pages)(AllocateType::ANY_PAGES, MemoryType::LOADER_DATA, 1, &mut page_table_allocation) };
-					if status != Status::SUCCESS {
-						panic!("Failed to allocate page table allocation: {status}")
-					}
-					println(format_args!("Page Table Allocation Address: {page_table_allocation:#X?}"));
-					unsafe {
-						page_table_allocation.to_ptr::<u8>().write_bytes(0, PAGE_SIZE);
-						page_global_directory_table.get_entries()[page_global_directory_index] = PageGlobalDirectoryEntry::new((page_table_allocation.to_ptr::<u8>() as u64) | permissive);
-					}
-					page_global_directory_table.entries()[page_global_directory_index].clone()
-				} else {
-					page_global_directory_table.entries()[page_global_directory_index].clone()
-				};
-				let page_upper_directory = unsafe { page_global_directory_entry.to_addr().get_entries() };
-
-				let mut page_upper_directory_entry = if !page_upper_directory[page_upper_directory_index].exists() {
-					let mut page_table_allocation = PhysicalAddress::new(0);
-					let status = unsafe { ((*system_table.boot_services).allocate_pages)(AllocateType::ANY_PAGES, MemoryType::LOADER_DATA, 1, &mut page_table_allocation) };
-					if status != Status::SUCCESS {
-						panic!("Failed to allocate page table allocation: {status}")
-					}
-					println(format_args!("Page Table Allocation Address: {page_table_allocation:#X?}"));
-					unsafe {
-						page_table_allocation.to_ptr::<u8>().write_bytes(0, PAGE_SIZE);
-						page_upper_directory[page_upper_directory_index] = PageUpperDirectoryEntry::new((page_table_allocation.to_ptr::<u8>() as u64) | permissive);
-					}
-					page_upper_directory[page_upper_directory_index].clone()
-				} else {
-					page_upper_directory[page_upper_directory_index].clone()
-				};
-				let page_middle_directory = unsafe { page_upper_directory_entry.to_addr().get_entries() };
-
-				let mut page_middle_directory_entry = if !page_middle_directory[page_middle_directory_index].exists() {
-					let mut page_table_allocation = PhysicalAddress::new(0);
-					let status = unsafe { ((*system_table.boot_services).allocate_pages)(AllocateType::ANY_PAGES, MemoryType::LOADER_DATA, 1, &mut page_table_allocation) };
-					if status != Status::SUCCESS {
-						panic!("Failed to allocate page table allocation: {status}")
-					}
-					println(format_args!("Page Table Allocation Address: {page_table_allocation:#X?}"));
-					unsafe {
-						page_table_allocation.to_ptr::<u8>().write_bytes(0, PAGE_SIZE);
-						page_middle_directory[page_middle_directory_index] = PageMiddleDirectoryEntry::new((page_table_allocation.to_ptr::<u8>() as u64) | permissive);
-					}
-					page_middle_directory[page_middle_directory_index].clone()
-				} else {
-					page_middle_directory[page_middle_directory_index].clone()
-				};
-				let page_tables = unsafe { page_middle_directory_entry.to_addr().get_entries() };
-
 				let page_permissions = {
 					let w = if elf_flags.get() & ProgramHeaderFlags::W.get() != 0 {
-						PageGlobalDirectoryEntry::READ_WRITE
+						EntryFlags::READ_WRITE
 					} else {
-						0
+						EntryFlags::default()
 					};
 					let x = if elf_flags.get() & ProgramHeaderFlags::X.get() != 0 {
-						0
+						EntryFlags::default()
 					} else {
-						PageGlobalDirectoryEntry::NOT_EXECUTABLE
+						EntryFlags::NOT_EXECUTABLE
 					};
-					let result = PageGlobalDirectoryEntry::PRESENT | w | x;
-					println(format_args!("Page Permissions: {result:#X}"));
-					result
+					EntryFlags::PRESENT | w | x
 				};
 
 				for i in 0..segment_pages {
-					if !page_tables[page_table_index + i].exists() {
-						page_tables[page_table_index + i] = unsafe { PageTableEntry::new((allocated_address.get() + i as u64 * 0x1000) | page_permissions) };
-					} else {
-						panic!("Tried to allocate {} index with original value {:#X?}", page_table_index + i, page_tables[page_table_index])
-					}
+					address_space.mmap(
+						VirtualAddress::new((virtual_address + (i << 12)) as u64),
+						PhysicalAddress::new(allocated_address.get() + (i << 12) as u64),
+						page_permissions,
+					);
 				}
+
 				println(format_args!("Segment_pages: {segment_pages}"));
 
 				segments_loaded += 1;
@@ -546,27 +275,39 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 	}
 	unsafe { ((*kernel_file).close)(kernel_file) };
 
-	unsafe {
-		core::arch::asm!("mov cr3, {}", in(reg) page_global_directory_table);
-	}
-
-	println(format_args!("Segments Loaded: {segments_loaded}"));
+	println(format_args!("Segments Loaded: {segments_loaded}, Pages Loaded: {pages_loaded}"));
 	if segments_loaded == 0 {
 		panic!("No segments?!");
 	}
 
-	let entry = kernel_entry.as_ptr() as u64 | high_half_base as u64;
-	println(format_args!("Entry: {entry:#X}"));
+	let trampoline_page = {
+		let mut address = PhysicalAddress::new(0);
+		let status = unsafe { ((*system_table.boot_services).allocate_pages)(AllocateType::ANY_PAGES, MemoryType::LOADER_DATA, 1, &mut address) };
+		if status != Status::SUCCESS {
+			println(format_args!("Failed to allocate page with status: {status}"));
+			return status;
+		}
+		unsafe { address.to_ptr::<u8>().write_bytes(0, 4096) };
+		address
+	};
 
-	// println(format_args!("Kernel Space:"));
-	// for i in 0..pages_loaded * 4096 {
-	// 	if i % 4096 == 0 {
-	// 		println(format_args!(""));
-	// 	}
-	// 	let x = unsafe { *(high_half_base as *const u8).add(i) };
-	// 	print(format_args!("{x:02X} "));
-	// }
-	// println(format_args!(""));
+	address_space.mmap(VirtualAddress::new(trampoline_page.get()), trampoline_page, EntryFlags::PRESENT);
+
+	let stack_page = {
+		let mut address = PhysicalAddress::new(0);
+		let status = unsafe { ((*system_table.boot_services).allocate_pages)(AllocateType::ANY_PAGES, MemoryType::LOADER_DATA, 1, &mut address) };
+		if status != Status::SUCCESS {
+			println(format_args!("Failed to allocate page with status: {status}"));
+			return status;
+		}
+		unsafe { address.to_ptr::<u8>().write_bytes(0, 4096) };
+		address
+	};
+
+	address_space.mmap(VirtualAddress::new(0xFFFFFFFFFFFFFFFF), trampoline_page, EntryFlags::READ_WRITE | EntryFlags::PRESENT);
+
+	// let entry = kernel_entry.as_ptr();
+	// println(format_args!("Entry: {entry:#X?}"));
 
 	// Interesting GUIDs:
 	// 00781CA1-5DE3-405F-ABB8-379C3C076984
@@ -701,27 +442,63 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 		(memory_map, map_key, memory_map_size, descriptor_size, descriptor_version)
 	};
 
-	for i in 0..memory_map_size / descriptor_size {
-		let descriptor = unsafe { (memory_map.add(i * descriptor_size) as *const MemoryDescriptor).as_ref_unchecked() };
-		println(format_args!("{descriptor:#X?}"));
-	}
-	println(format_args!("descriptor size: {descriptor_size}, type size: {}", size_of::<MemoryDescriptor>()));
+	// for i in 0..memory_map_size / descriptor_size {
+	// 	let descriptor = unsafe { (memory_map.add(i * descriptor_size) as *const MemoryDescriptor).as_ref_unchecked() };
+	// 	println(format_args!("{descriptor:#X?}"));
+	// }
+	// println(format_args!("descriptor size: {descriptor_size}, type size: {}", size_of::<MemoryDescriptor>()));
 
 	match unsafe { ((*system_table.boot_services).exit_boot_services)(image_handle, map_key) } {
 		Status::SUCCESS => {
 			println(format_args!("Exit Boot Services Succeeded!"));
-			let header = boot_info::KernelDataHeader {
-				graphics_len,
-				graphics_ptr,
-				root_system_description_pointer,
-				root_system_description_pointer_ex,
-				system_table,
-				virtual_mappings_count: pages_loaded,
-			};
-			// let start: extern "C" fn(data: &boot_info::KernelDataHeader) -> ! = unsafe { core::mem::transmute(kernel_entry.as_ptr() as u64 | high_half_base as u64) };
+			// let header = boot_info::KernelDataHeader {
+			// 	graphics_len,
+			// 	graphics_ptr,
+			// 	root_system_description_pointer,
+			// 	root_system_description_pointer_ex,
+			// 	system_table,
+			// 	virtual_mappings_count: pages_loaded,
+			// };
+			// let start: extern "C" fn(data: &boot_info::KernelDataHeader) -> ! = unsafe { core::mem::transmute(kernel_entry.as_ptr()) };
 			// start(&header);
-			let start: extern "C" fn() -> ! = unsafe { core::mem::transmute(kernel_entry.as_ptr() as u64 | high_half_base as u64) };
-			start();
+			// let start: extern "C" fn() -> ! = unsafe { core::mem::transmute(kernel_entry.as_ptr()) };
+			// start();
+			// unsafe {
+			// 	core::arch::asm!("mov cr3, {}", in(reg) address_space.ptr);
+			// }
+			let mut start = ptr::null::<u8>();
+			let mut end = ptr::null::<u8>();
+			let mut size = 0usize;
+
+			unsafe {
+				core::arch::asm!(
+					"lea {start}, [2f]",
+					"lea {end}, [3f]",
+					"jmp 3f",
+					"2:",
+					"mov cr3, {address_space}",
+					"jmp {kernel_entry}",
+					"4:",
+					"jmp 4b",
+					"3:",
+					"mov {size}, {end}",
+					"sub {size}, {start}",
+					"mov rsi, {start}",
+					"mov rdi, {trampoline}",
+					"mov rcx, {size}",
+					"rep movsb",
+					"xor rsp, rsp",
+					"jmp {trampoline}",
+					start = in(reg) start,
+					end = in(reg) end,
+					size = in(reg) size,
+					// stack = in(reg) stack_addr,
+					trampoline = in(reg) trampoline_page.to_ptr::<u8>(),
+					address_space = in(reg) address_space.get_ptr(),
+					kernel_entry = in(reg) kernel_entry.as_ptr(),
+					options(noreturn)
+				)
+			}
 		},
 		Status::INVALID_PARAMETER => {
 			println(format_args!("Exit Boot Services Failed!"));
@@ -740,340 +517,6 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 		},
 		_ => unreachable!(),
 	}
-
-	// let max = core::arch::x86_64::__cpuid(0x80000000);
-	// if max.eax < 0x80000008 {
-	// 	return Status::INVALID_PARAMETER;
-	// }
-	// println(format_args!("MAX CPUID: {}", max.eax));
-
-	// let vendor_info = unsafe { core::mem::transmute::<core::arch::x86_64::CpuidResult, [u8; size_of::<core::arch::x86_64::CpuidResult>()]>(core::arch::x86_64::__cpuid(0x00000000)) };
-	// print_string("Vendor Info: ");
-	// println_string_bytes(unsafe { core::slice::from_raw_parts(vendor_info.as_ptr().add(size_of::<u32>()), 3 * size_of::<u32>()) });
-
-	// let flag_strings = [
-	// 	"FPU,",
-	// 	"VME,",
-	// 	"DE,",
-	// 	"PSE,",
-	// 	"TSC,",
-	// 	"MSR,",
-	// 	"PAE,",
-	// 	"MCE,",
-	// 	"CX8,",
-	// 	"APIC,",
-	// 	"RESERVED,",
-	// 	"SEP,",
-	// 	"MTRR,",
-	// 	"PGE,",
-	// 	"MCA,",
-	// 	"CMOV,",
-	// 	"PAT,",
-	// 	"PSE-36,",
-	// 	"PSN,",
-	// 	"CLFSH,",
-	// 	"RESERVED,",
-	// 	"DS,",
-	// 	"ACPI,",
-	// 	"MMX,",
-	// 	"FXSR,",
-	// 	"SSE,",
-	// 	"SSE2,",
-	// 	"SS,",
-	// 	"HTT,",
-	// 	"TM,",
-	// 	"RESERVED,",
-	// 	"PBE,",
-	// ];
-	// let test = core::arch::x86_64::__cpuid(0x00000001);
-	// print(format_args!("Flags: "));
-	// for (i, string) in flag_strings.iter().enumerate() {
-	// 	if test.edx & (1 << i) > 0 {
-	// 		print(format_args!("{string}"));
-	// 	}
-	// }
-	// println(format_args!(""));
-
-	// let tlb_info = core::arch::x86_64::__cpuid(0x00000002);
-	// println(format_args!("TLB Info: {tlb_info:?}"));
-
-	// let cache_info = core::arch::x86_64::__cpuid(0x00000002);
-	// println(format_args!("Cache Info: {cache_info:?}"));
-
-	// let addr_info = core::arch::x86_64::__cpuid(0x80000008);
-	// println(format_args!("Address Space Info: {addr_info:?}"));
-
-	// let rflags_flags = [
-	// 	"CF,",
-	// 	"RESERVED,",
-	// 	"PF,",
-	// 	"RESERVED,",
-	// 	"AF,",
-	// 	"RESERVED,",
-	// 	"ZF,",
-	// 	"SF,",
-	// 	"TF,",
-	// 	"IF,",
-	// 	"DF,",
-	// 	"OF,",
-	// 	"IOPL,",
-	// 	"IOPL,",
-	// 	"NT,",
-	// 	"RESERVED,",
-	// 	"RF,",
-	// 	"VM,",
-	// 	"AC,", // bit 18
-	// 	"VIF,",
-	// 	"VIP,",
-	// 	"ID,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// ];
-	// let rflags: u64;
-	// unsafe { core::arch::asm!("pushfq","pop {}", out(reg) rflags) };
-	// print(format_args!("RFLAGS: "));
-	// for (i, string) in rflags_flags.iter().enumerate() {
-	// 	if rflags & (1 << i) > 0 {
-	// 		print(format_args!("{string}"));
-	// 	}
-	// }
-	// println(format_args!(""));
-
-	// let efer_features = [
-	// 	"SCE,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"LME,", // bit 8
-	// 	"RESERVED,",
-	// 	"LMA,",
-	// 	"NXE,", // bit 11
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// 	"RESERVED,",
-	// ];
-	// let efer = unsafe { arch::x86_64::rdmsr(0xC0000080) };
-	// print(format_args!("EFER: "));
-	// for (i, string) in efer_features.iter().enumerate() {
-	// 	if efer & (1 << i) > 0 {
-	// 		print(format_args!("{string}"));
-	// 	}
-	// }
-	// println(format_args!(""));
-
-	// Task Priority Register
-	// lowest 4 bits for 1-15 task priority where 0 enables and 15 disables all external interrupts
-	// let cr8: u64;
-	// unsafe { core::arch::asm!("mov {}, cr8", out(reg) cr8) };
-	// println(format_args!("CR8: {cr8:X}"));
-
-	// let cr2: u64;
-	// unsafe { core::arch::asm!("mov {}, cr2", out(reg) cr2) };
-	// println(format_args!("CR2: {cr2:X}"));
-
-	// let control_flag_strings = [
-	// 	"PE,",
-	// 	"MP,",
-	// 	"EM,",
-	// 	"TS,",
-	// 	"ET,",
-	// 	"NE,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"WP,", // bit 16
-	// 	"Reserved,",
-	// 	"AM,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"NW,",
-	// 	"CD,",
-	// 	"PG,", // bit 31
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// 	"Reserved,",
-	// ];
-	// let cr0: u64;
-	// unsafe { core::arch::asm!("mov {}, cr0", out(reg) cr0) };
-	// print(format_args!("CR0: "));
-	// for (i, string) in control_flag_strings.iter().enumerate() {
-	// 	if cr0 & (1 << i) > 0 {
-	// 		print(format_args!("{string}"));
-	// 	}
-	// }
-	// println(format_args!(""));
-}
-
-#[repr(C, align(4096))]
-#[derive(Debug)]
-struct Page {
-	data: [u8; 4096],
-}
-
-#[derive(Debug)]
-struct AddressSpace {
-	ptr: *mut Page,
-	levels: u8,
-}
-
-impl AddressSpace {
-	fn create(levels: u8) -> Self {
-		if let Some(ptr) = unsafe { SYSTEM_TABLE_POINTER } {
-			let num_pages = 1;
-			let mut paddr = PhysicalAddress::new(0);
-			let status = unsafe { ((*ptr.boot_services).allocate_pages)(AllocateType::ANY_PAGES, MemoryType::LOADER_DATA, num_pages, &mut paddr) };
-			if status != Status::SUCCESS {
-				panic!("Failed to allocate address space with error: {status}")
-			} else {
-				println(format_args!("Allocated address space at physical address {paddr:#X}"));
-			}
-			unsafe {
-				paddr.to_ptr::<Page>().write_bytes(0, num_pages);
-			}
-			Self { ptr: paddr.to_ptr(), levels }
-		} else {
-			panic!("You didn't initialize the SYSTEM_TABLE_POINTER")
-		}
-	}
-
-	fn mmap(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, flags: u64) {}
 }
 
 #[panic_handler]
@@ -1083,8 +526,9 @@ fn panic(info: &panic::PanicInfo) -> ! {
 	let file_name = location.file();
 	let line_number = location.line();
 	let column_number = location.column();
-	let format = format_args!("Panicked at: {file_name}\n\tline number: {line_number}\n\tcolumn number: {column_number}\n\tmessage: {message}");
-	println(format);
+	println(format_args!(
+		"Panicked at: {file_name}\n\tline number: {line_number}\n\tcolumn number: {column_number}\n\tmessage: {message}"
+	));
 	if let Some(ptr) = unsafe { SYSTEM_TABLE_POINTER } {
 		unsafe { ((*ptr.runtime_services).reset_system)(ResetType::SHUTDOWN, Status::SUCCESS, 0, ptr::null()) }
 	} else {
