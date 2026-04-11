@@ -78,12 +78,13 @@ impl<const SIZE: usize> IndexMut<usize> for Page<SIZE> {
 
 #[derive(Debug)]
 pub struct AddressSpace {
-	ptr: *mut Page,
+	ptr: PhysicalAddress,
 	// TODO: Actually use this field to map things properly
 	levels: u8,
 }
 
 impl AddressSpace {
+	pub const ADDRESS_SPACE: MemoryType = MemoryType::custom_os(0x80000003);
 	pub fn create(levels: u8) -> Self {
 		// # Safety:
 		let ptr = unsafe { SYSTEM_TABLE_POINTER }.expect("System Table Pointer uninitialized");
@@ -94,45 +95,83 @@ impl AddressSpace {
 		if status != Status::SUCCESS {
 			panic!("Failed to allocate address space with error: {status}")
 		} else {
-			println(format_args!("Allocated address space at physical address {paddr:#X}"));
+			println(format_args!("Allocated address space at physical address {paddr:X}"));
 		}
 		// # Safety:
 		unsafe {
 			paddr.to_ptr::<Page>().write_bytes(0, num_pages);
 		}
-		Self { ptr: paddr.to_ptr(), levels }
+		Self { ptr: paddr, levels }
 	}
 
 	pub fn get_ptr(&self) -> *mut Page {
-		self.ptr
+		self.ptr.to_ptr::<Page>()
 	}
 
-	/// TODO: Figure out how I would do stuff with more than just PML4 4KiB pages
-	pub fn mmap(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, flags: EntryFlags) {
-		fn get_or_create_entry(ptr: *mut Table, table_index: usize, flags: EntryFlags) -> Entry {
-			// # Safety:
-			let table = unsafe { &mut *ptr };
+	pub fn get_physical_address(&self, vaddr: VirtualAddress) -> PhysicalAddress {
+		assert!(self.levels == 4);
+		let index_mask = 0x1FF;
+		let vaddr_offset = vaddr.get() & 0xFFF;
+		let vaddr_no_offset = vaddr.get() as usize >> 12;
 
-			if !table.entries()[table_index].exists() {
+		let page_table_index = (vaddr_no_offset >> (9 * 0)) & index_mask;
+		let page_middle_directory_index = (vaddr_no_offset >> (9 * 1)) & index_mask;
+		let page_upper_directory_index = (vaddr_no_offset >> (9 * 2)) & index_mask;
+		let page_global_directory_index = (vaddr_no_offset >> (9 * 3)) & index_mask;
+
+		let table = unsafe { &mut *self.ptr.to_ptr::<Table>() };
+
+		let page_global_directory_entry = Self::get_entry(table, page_global_directory_index).expect("Until I figure out how to deal with less than exactly 4 tables this is expected");
+		let page_upper_directory_entry =
+			Self::get_entry(page_global_directory_entry.to_addr(), page_upper_directory_index).expect("Until I figure out how to deal with less than exactly 4 tables this is expected");
+		let page_middle_directory_entry =
+			Self::get_entry(page_upper_directory_entry.to_addr(), page_middle_directory_index).expect("Until I figure out how to deal with less than exactly 4 tables this is expected");
+
+		let page_table = Self::get_entry(page_middle_directory_entry.to_addr(), page_table_index).expect("Until I figure out how to deal with less than exactly 4 tables this is expected");
+		PhysicalAddress::new((page_table.to_addr() as *const _ as u64) | vaddr_offset)
+	}
+
+	fn get_entry(ptr: *const Table, table_index: usize) -> Result<Entry, ()> {
+		let table = unsafe { &*ptr };
+		let entry = table.entries()[table_index].clone();
+		if entry.exists() {
+			// TODO: Make it so that this isn't necessary
+			if entry.get_flags() & EntryFlags::PAGE_SIZE == EntryFlags::NONE {
+				Ok(entry)
+			} else {
+				panic!("Expanded page size bit set")
+			}
+		} else {
+			Err(())
+		}
+	}
+
+	fn get_or_create_entry(ptr: *mut Table, table_index: usize, flags: EntryFlags) -> Entry {
+		match Self::get_entry(ptr, table_index) {
+			Ok(entry) => entry,
+			Err(_) => {
 				let mut page_table_allocation = PhysicalAddress::new(0);
 				// # Safety:
 				let status =
-					unsafe { ((*SYSTEM_TABLE_POINTER.expect("SYSTEM_TABLE_POINTER").boot_services).allocate_pages)(AllocateType::ANY_PAGES, MemoryType::LOADER_DATA, 1, &mut page_table_allocation) };
+					unsafe { ((*SYSTEM_TABLE_POINTER.expect("SYSTEM_TABLE_POINTER").boot_services).allocate_pages)(AllocateType::ANY_PAGES, Self::ADDRESS_SPACE, 1, &mut page_table_allocation) };
 				if status != Status::SUCCESS {
 					panic!("Failed to allocate page table allocation: {status}")
 				}
 				println(format_args!("Page Table Allocation Address: {page_table_allocation:#X?}"));
 				// # Safety:
 				unsafe {
+					let entry = Entry::new((page_table_allocation.to_ptr::<Page>() as u64) | flags.get());
 					page_table_allocation.to_ptr::<u8>().write_bytes(0, PAGE_SIZE);
-					table.get_entries()[table_index] = Entry::new((page_table_allocation.to_ptr::<Page>() as u64) | flags.get());
+					(&mut *ptr).get_entries()[table_index] = entry.clone();
+					entry
 				}
-				table.entries()[table_index].clone()
-			} else {
-				table.entries()[table_index].clone()
-			}
+			},
 		}
+	}
 
+	pub fn mmap(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, flags: EntryFlags) {
+		// TODO: Figure out how I would do stuff with more than just PML4 4KiB pages
+		assert!(self.levels == 4);
 		let permissive = EntryFlags::PRESENT | EntryFlags::READ_WRITE | EntryFlags::USER_ACCESSIBLE;
 		let index_mask = 0x1FF;
 
@@ -142,16 +181,12 @@ impl AddressSpace {
 		let page_upper_directory_index = (vaddr_no_offset >> (9 * 2)) & index_mask;
 		let page_global_directory_index = (vaddr_no_offset >> (9 * 3)) & index_mask;
 
-		// if flags & EntryFlags::PAGE_SIZE != EntryFlags::NONE {
-		// 	println(format_args!("Page Size bit set"));
-		// }
-
 		// for i in 0..self.levels {}
-		let mut page_global_directory_entry = get_or_create_entry(self.ptr as *mut Table, page_global_directory_index, permissive);
-		let mut page_upper_directory_entry = get_or_create_entry(page_global_directory_entry.to_addr(), page_upper_directory_index, permissive);
-		let mut page_middle_directory_entry = get_or_create_entry(page_upper_directory_entry.to_addr(), page_middle_directory_index, permissive);
+		let mut page_global_directory_entry = Self::get_or_create_entry(self.ptr.to_ptr::<Table>(), page_global_directory_index, permissive);
+		let mut page_upper_directory_entry = Self::get_or_create_entry(page_global_directory_entry.to_mut_addr(), page_upper_directory_index, permissive);
+		let mut page_middle_directory_entry = Self::get_or_create_entry(page_upper_directory_entry.to_mut_addr(), page_middle_directory_index, permissive);
 
-		let page_table = page_middle_directory_entry.to_addr();
+		let page_table = page_middle_directory_entry.to_mut_addr();
 
 		if page_table.entries()[page_table_index].exists() {
 			panic!("Trying to map a page twice to the same entry seems problematic")

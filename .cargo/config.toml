@@ -1,5 +1,6 @@
 [build]
-rustflags = ["-C", "relocation-model=static", "-C", "code-model=kernel"]
+# rustflags = ["-C", "relocation-model=static", "-C", "code-model=kernel"]
+rustflags = ["-C", "relocation-model=pic", "-C", "code-model=kernel"]
 
 [unstable]
 bindeps = true

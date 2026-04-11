@@ -9,15 +9,11 @@ use core::fmt::{
 	Write,
 };
 
-// use bootloader::boot_info;
-
-#[inline(always)]
 fn println(args: core::fmt::Arguments<'_>) {
 	let mut port = Port::COM1;
 	let _ = writeln!(port, "{args}");
 }
 
-#[inline(always)]
 fn print(args: core::fmt::Arguments<'_>) {
 	let mut port = Port::COM1;
 	let _ = write!(port, "{args}");
@@ -27,7 +23,6 @@ fn print(args: core::fmt::Arguments<'_>) {
 struct Port(u16);
 
 impl Write for Port {
-	#[inline(always)]
 	fn write_str(&mut self, s: &str) -> core::fmt::Result {
 		let str = s.as_bytes();
 		let len = str.len();
@@ -55,7 +50,6 @@ impl Port {
 	const MODEM_STATUS: u16 = 6;
 	const SCRATCH: u16 = 7;
 
-	#[inline(always)]
 	pub unsafe fn init(&self) {
 		unsafe {
 			Self(self.0 + Self::INT_ENABLE).out(0x00);
@@ -77,7 +71,6 @@ impl Port {
 		}
 	}
 
-	#[inline(always)]
 	unsafe fn out(&self, value: u8) {
 		unsafe {
 			core::arch::asm!(
@@ -88,7 +81,6 @@ impl Port {
 		}
 	}
 
-	#[inline(always)]
 	unsafe fn inb(&self) -> u8 {
 		let value: u8;
 		unsafe {
@@ -101,7 +93,6 @@ impl Port {
 		value
 	}
 
-	#[inline(always)]
 	unsafe fn out_bytes(&self, bytes: &[u8]) -> usize {
 		let unwritten_bytes: usize;
 		unsafe {
@@ -116,18 +107,19 @@ impl Port {
 	}
 }
 
-#[unsafe(no_mangle)]
-extern "C" fn _start(/* data: &boot_info::KernelDataHeader */) -> ! {
-	let port = Port::COM1;
-	unsafe { port.out_bytes(b"Hello Kernel!\n") };
+use bootloader::boot_info;
 
+#[unsafe(no_mangle)]
+extern "C" fn _start(data: boot_info::KernelDataHeader) -> ! {
 	// let buffer = unsafe { core::slice::from_raw_parts_mut(data.graphics_ptr, data.graphics_len) };
 	// let mask = uefi::protocols::graphics::PixelBitmask::new(0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
 	// let white = uefi::protocols::graphics::GraphicsOutputProtocol::grapics_color(0xFFFFFFFF, &mask);
 	// for pixel in buffer {
 	// 	*pixel = white;
 	// }
-	println(format_args!("Nope"));
+	let port = Port::COM1;
+	unsafe { port.out_bytes(b"Hello Kernel!\n") };
+	println(format_args!("Statement"));
 	loop {}
 	// Model specific extensions register
 	// Can use CPUID to query support for feature except for performance counter extensions
@@ -510,7 +502,13 @@ extern "C" fn _start(/* data: &boot_info::KernelDataHeader */) -> ! {
 #[panic_handler]
 #[allow(unused_variables)]
 fn panic(info: &core::panic::PanicInfo) -> ! {
-	let port = Port::COM1;
-	unsafe { port.out_bytes(b"Hello Panic!\n") };
+	let message = info.message();
+	let location = info.location().unwrap();
+	let file_name = location.file();
+	let line_number = location.line();
+	let column_number = location.column();
+	println(format_args!(
+		"Panicked at: {file_name}\n\tline number: {line_number}\n\tcolumn number: {column_number}\n\tmessage: {message}"
+	));
 	loop {}
 }

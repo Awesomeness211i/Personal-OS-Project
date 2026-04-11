@@ -1,4 +1,4 @@
-#![feature(adt_const_params)]
+#![feature(const_trait_impl, const_range, const_cmp, structural_match)]
 #![deny(clippy::undocumented_unsafe_blocks)]
 // #![warn(missing_docs)]
 #![no_std]
@@ -28,7 +28,7 @@ pub use chars::Char16;
 pub use strings::CStr16;
 
 #[repr(transparent)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct SystemTablePointer(&'static tables::SystemTable);
 
 impl core::ops::Deref for SystemTablePointer {
@@ -250,13 +250,13 @@ impl PhysicalAddress {
 
 impl core::fmt::LowerHex for PhysicalAddress {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		write!(f, "{:x}", self.0)
+		write!(f, "{:#x}", self.0)
 	}
 }
 
 impl core::fmt::UpperHex for PhysicalAddress {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		write!(f, "{:X}", self.0)
+		write!(f, "{:#X}", self.0)
 	}
 }
 
@@ -274,13 +274,13 @@ impl VirtualAddress {
 
 impl core::fmt::LowerHex for VirtualAddress {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		write!(f, "{:x}", self.0)
+		write!(f, "{:#x}", self.0)
 	}
 }
 
 impl core::fmt::UpperHex for VirtualAddress {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		write!(f, "{:X}", self.0)
+		write!(f, "{:#X}", self.0)
 	}
 }
 

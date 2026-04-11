@@ -12,4 +12,4 @@ bench = false
 # uefi = { path = "../uefi" }
 # acpi = { path = "../acpi" }
 # arch = { path = "../arch" }
-# bootloader = { path = "../bootloader" }
+bootloader = { path = "../bootloader" }

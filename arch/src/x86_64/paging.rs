@@ -92,7 +92,12 @@ impl Entry {
 		EntryFlags(self.0 & !Self::PHYSICAL_ADDRESS)
 	}
 
-	pub const fn to_addr(&mut self) -> &mut Table {
+	pub const fn to_addr(&self) -> &Table {
+		// # Safety:
+		unsafe { &*((self.0 & Self::PHYSICAL_ADDRESS) as *const Table) }
+	}
+
+	pub const fn to_mut_addr(&mut self) -> &mut Table {
 		// # Safety:
 		unsafe { &mut *((self.0 & Self::PHYSICAL_ADDRESS) as *mut Table) }
 	}
@@ -114,10 +119,4 @@ impl<const ENTRY_NUM: usize> Table<ENTRY_NUM> {
 	pub unsafe fn get_entries(&mut self) -> &mut [Entry] {
 		&mut self.entries
 	}
-}
-
-#[repr(C, align(4096))]
-#[derive(Debug)]
-pub struct Page {
-	entries: [u8; 4096],
 }
