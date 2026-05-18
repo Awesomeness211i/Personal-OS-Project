@@ -18,7 +18,7 @@ pub struct SystemDescriptionTableHeader {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RootSystemDescriptionPointer {
 	pub signature: [u8; 8],
 	pub checksum: u8,
@@ -28,7 +28,7 @@ pub struct RootSystemDescriptionPointer {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RootSystemDescriptionPointerEx {
 	pub rsdp: RootSystemDescriptionPointer,
 	pub length: u32,

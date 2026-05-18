@@ -29,7 +29,7 @@ pub mod TableStates {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TableHeader {
 	pub signature: u64,
 	pub revision: u32,
@@ -201,7 +201,7 @@ impl ConformanceProfilesTable {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SystemTable {
 	pub header: TableHeader,
 	firmware_vendor: *const Char16,

@@ -11,8 +11,6 @@ use core::{
 	slice,
 };
 
-use crate::print::println;
-
 pub type Elf32Half = u16;
 pub type Elf32Off = u32;
 pub type Elf32Addr = u32;
@@ -267,7 +265,6 @@ impl ElfHeader {
 		{
 			return false;
 		}
-		println(format_args!("Executable Type: {:?}", self.executable_type));
 		if !(self.executable_type == ExecutableType::EXECUTABLE || self.executable_type == ExecutableType::DYNAMIC) {
 			return false;
 		}

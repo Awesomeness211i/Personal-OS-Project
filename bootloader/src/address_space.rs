@@ -191,13 +191,13 @@ impl AddressSpace {
 		if page_table.entries()[page_table_index].exists() {
 			panic!("Trying to map a page twice to the same entry seems problematic")
 		} else {
-			print(format_args!("{paddr:#X} -> {:#X}: ", vaddr.get() & !0xFFF));
-			for i in 0..PAGE_SIZE {
-				// # Safety:
-				let b = unsafe { *paddr.to_ptr::<u8>().add(i) };
-				print(format_args!("{b:02X} "));
-			}
-			println(format_args!(""));
+			println(format_args!("{paddr:#X} -> {:#X}", vaddr.get() & !0xFFF));
+			// for i in 0..PAGE_SIZE {
+			// 	// # Safety:
+			// 	let b = unsafe { *paddr.to_ptr::<u8>().add(i) };
+			// 	print(format_args!("{b:02X} "));
+			// }
+			// println(format_args!(""));
 
 			// # Safety:
 			unsafe { page_table.get_entries()[page_table_index] = Entry::new(paddr.get() | flags.get()) }

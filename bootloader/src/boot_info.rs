@@ -22,14 +22,15 @@ pub struct MappingInfo {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct KernelDataHeader {
 	/// size of structure in bytes
 	pub graphics_len: usize,
 	pub graphics_ptr: *mut uefi::protocols::graphics::GraphicsPixel,
-	pub root_system_description_pointer: Option<&'static RootSystemDescriptionPointer>,
-	pub root_system_description_pointer_ex: Option<&'static RootSystemDescriptionPointerEx>,
-	pub system_table: Option<uefi::SystemTablePointer>,
+	pub graphics_format: uefi::protocols::graphics::GraphicsPixelFormat,
+	pub root_system_description_pointer: Option<RootSystemDescriptionPointer>,
+	pub root_system_description_pointer_ex: Option<RootSystemDescriptionPointerEx>,
+	pub system_table: uefi::tables::SystemTable,
 	pub virtual_mappings_count: usize,
 	// pub memorymap: uefi::memory::MemoryMap,
 	// pub imagehandle: uefi::Handle,

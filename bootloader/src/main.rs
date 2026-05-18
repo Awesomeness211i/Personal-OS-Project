@@ -27,6 +27,7 @@ use bootloader::{
 		Elf64Rel,
 		Elf64Rela,
 		ElfHeader,
+		ExecutableType,
 		ProgramHeaderFlags,
 		ProgramHeaderType,
 	},
@@ -55,6 +56,7 @@ use uefi::{
 			GraphicsOutputBLTOperation,
 			GraphicsOutputProtocol,
 			GraphicsPixel,
+			GraphicsPixelFormat,
 			PixelBitmask,
 		},
 		image::LoadedImageProtocol,
@@ -119,6 +121,9 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 	unsafe { ((*system_table.std_err).reset)(system_table.std_err, true) };
 	unsafe { ((*system_table.console_in).reset)(system_table.console_in, true) };
 
+	// Disable watchdog timer
+	// unsafe { ((*system_table.boot_services).set_watchdog_timer)(0, 0, 0, None) };
+
 	let loaded_image = {
 		let mut interface_ptr = ptr::null();
 		let status = unsafe { ((*system_table.boot_services).handle_protocol)(image_handle, &LoadedImageProtocol::GUID, &mut interface_ptr) };
@@ -161,8 +166,18 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 	};
 
 	let kernel_elf_header = read_file_offset::<ElfHeader>(kernel_file, 0);
+	println(format_args!("Executable Type: {:?}", kernel_elf_header.executable_type));
+	#[allow(overflowing_literals)]
+	let base_address = if kernel_elf_header.executable_type == ExecutableType::DYNAMIC {
+		// TODO: Actually figure out what base address I want or even potentially do randomization?
+		0xFFFF_8000_0000_0000
+		// 0x0000_7FFF_FFFF_FFFF
+	} else {
+		0x0
+	};
+
 	if !kernel_elf_header.is_supported_and_valid() {
-		panic!("Expected a supported and valid header but got {kernel_elf_header:#?}")
+		panic!("Expected a supported and valid header but got {kernel_elf_header:#?}");
 	}
 
 	let Some(kernel_program_header_num) = kernel_elf_header.program_header_num else {
@@ -177,30 +192,10 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 		panic!("ELF has no entry point");
 	};
 
-	// let Some(kernel_section_header_offset) = kernel_elf_header.section_header_offset else {
-	// 	panic!("Didn't find any section headers");
-	// };
-
-	// let kernel_section_header_num = {
-	// 	let Some(kernel_section_header_num) = kernel_elf_header.section_header_num else {
-	// 		panic!("Didn't find any section headers");
-	// 	};
-	//
-	// 	if kernel_section_header_num.get() >= 0xFF00 {
-	// 		let section_header = read_file_offset::<Elf64SectionHeader>(kernel_file, kernel_section_header_offset.get() as u64);
-	// 		section_header.size
-	// 	} else {
-	// 		kernel_section_header_num.get() as u64
-	// 	}
-	// };
-
 	let mut address_space = AddressSpace::create(4);
 
 	let mut segments_loaded = 0;
 	let mut pages_loaded = 0;
-	#[allow(overflowing_literals)]
-	let base_address = 0xFFFF_8000_0000_0000;
-	// let asdf_address = 0x0000_7FFF_FFFF_FFFFu64;
 	for i in 0..kernel_program_header_num.get() {
 		let program_header = read_file_offset::<Elf64ProgramHeader>(kernel_file, kernel_program_header_offset.get() as u64 + i as u64 * kernel_elf_header.program_header_entry_size as u64);
 		println(format_args!("{program_header:?}"));
@@ -302,6 +297,7 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 				set_position(kernel_file, offset as u64);
 				loop {
 					let dynamic_entry = read_file::<Elf64Dynamic>(kernel_file);
+					println(format_args!("{dynamic_entry:#?}"));
 					match dynamic_entry {
 						Elf64Dynamic::HASH { ptr: _ } => {},
 						Elf64Dynamic::STRTAB { ptr: _ } => {},
@@ -321,28 +317,33 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 					}
 				}
 
-				assert!(rela_entry_size as usize >= size_of::<Elf64Rela>());
-				for i in 0..rela_size / rela_entry_size {
-					let rela_entry = read_file_offset::<Elf64Rela>(kernel_file, rela + i * rela_entry_size);
-					let rela_type = Elf64RTypeX86_64::new(rela_entry.r_info);
+				if rela_entry_size > 0 {
+					println(format_args!("actual: {rela_entry_size}, expected: {}", size_of::<Elf64Rela>()));
+					assert!(rela_entry_size as usize >= size_of::<Elf64Rela>());
+					for i in 0..rela_size / rela_entry_size {
+						let rela_entry = read_file_offset::<Elf64Rela>(kernel_file, rela + i * rela_entry_size);
+						let rela_type = Elf64RTypeX86_64::new(rela_entry.r_info);
 
-					let offset = rela_entry.r_offset;
-					let addend = rela_entry.r_addend;
-					let address = address_space.get_physical_address(VirtualAddress::new(base_address as u64 + offset));
-					match rela_type {
-						// Base address + addend
-						Elf64RTypeX86_64::R_AMD64_RELATIVE => {
-							let relative = base_address + addend;
-							// TODO: Check that this is correct
-							unsafe {
-								address.to_ptr::<i64>().write(relative);
-							}
-						},
-						t => println(format_args!("type: {:#X}", t.get())),
+						let offset = rela_entry.r_offset;
+						let addend = rela_entry.r_addend;
+						let address = address_space.get_physical_address(VirtualAddress::new(base_address as u64 + offset));
+						match rela_type {
+							// Base address + addend
+							Elf64RTypeX86_64::R_AMD64_RELATIVE => {
+								let relative = base_address + addend;
+								// TODO: Check that this is correct
+								unsafe {
+									address.to_ptr::<i64>().write(relative);
+								}
+							},
+							t => println(format_args!("type: {:#X}", t.get())),
+						}
 					}
 				}
 
 				if rel_entry_size > 0 {
+					println(format_args!("actual: {rela_entry_size}, expected: {}", size_of::<Elf64Rela>()));
+					assert!(rel_entry_size as usize >= size_of::<Elf64Rel>());
 					for i in 0..rel_size / rel_entry_size {
 						let rel_entry = read_file_offset::<Elf64Rel>(kernel_file, rel + i * rel_entry_size);
 						println(format_args!("{rel_entry:#?}"));
@@ -372,22 +373,29 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 
 	address_space.mmap(VirtualAddress::new(trampoline_page.get()), trampoline_page, EntryFlags::PRESENT);
 
-	let stack_page = {
+	let (stack_pages, stack_page_number) = {
+		let number = 5;
 		let mut address = PhysicalAddress::new(0);
-		let status = unsafe { ((*system_table.boot_services).allocate_pages)(AllocateType::ANY_PAGES, STACK_PAGE, 1, &mut address) };
+		let status = unsafe { ((*system_table.boot_services).allocate_pages)(AllocateType::ANY_PAGES, STACK_PAGE, number, &mut address) };
 		if status != Status::SUCCESS {
-			println(format_args!("Failed to allocate page with status: {status}"));
-			return status;
+			panic!("Failed to allocate page with status: {status}")
 		}
-		unsafe { address.to_ptr::<u8>().write_bytes(0, 4096) };
-		address
+		unsafe { address.to_ptr::<u8>().write_bytes(0, number << 12) };
+		(address, number)
 	};
 
-	address_space.mmap(
-		VirtualAddress::new(0xFFFFFFFFFFFFFFFF),
-		stack_page,
-		EntryFlags::NOT_EXECUTABLE | EntryFlags::WRITE_THROUGH | EntryFlags::PAGE_CACHE_DISABLE | EntryFlags::READ_WRITE | EntryFlags::PRESENT,
-	);
+	for i in 0..stack_page_number {
+		// This should be the case because the distance from 0xFFFF_8000_0000_0000 to
+		// 0x0000_7FFF_FFFF_FFFF is 0x8000_0000_0000 bytes and shifting that right by 12 (division by 4096)
+		// gives 0x8_0000_0000 those other numbers come from the cannonical address range of x86_64
+		assert!(stack_page_number < 0x0008_0000_0000);
+		let start = 0xFFFFFFFFFFFFFFFF - ((stack_page_number << 12) - 1);
+		address_space.mmap(
+			VirtualAddress::new((start + (i << 12)) as u64),
+			PhysicalAddress::new(stack_pages.get() + (i << 12) as u64),
+			EntryFlags::NOT_EXECUTABLE | EntryFlags::WRITE_THROUGH | EntryFlags::PAGE_CACHE_DISABLE | EntryFlags::READ_WRITE | EntryFlags::PRESENT,
+		);
+	}
 
 	// Interesting GUIDs:
 	// 00781CA1-5DE3-405F-ABB8-379C3C076984
@@ -407,7 +415,7 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 					println(format_args!("Not an ACPI20 table?"));
 					return Status::ABORTED;
 				}
-				root_system_description_pointer_ex = Some(unsafe { (table.vendor_table as *const acpi::RootSystemDescriptionPointerEx).as_ref_unchecked() });
+				root_system_description_pointer_ex = Some(t);
 			},
 			ConfigurationTable::ACPI_10_TABLE => {
 				let acpi_table = table.vendor_table as *const acpi::RootSystemDescriptionPointer;
@@ -416,7 +424,7 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 					println(format_args!("Not an ACPI10 table?"));
 					return Status::ABORTED;
 				}
-				root_system_description_pointer = Some(unsafe { (table.vendor_table as *const acpi::RootSystemDescriptionPointer).as_ref_unchecked() });
+				root_system_description_pointer = Some(t);
 			},
 			ConfigurationTable::SMBIOS_TABLE => {
 				// let smbios = table.vendortable as *const SMBIOSTable_64;
@@ -438,38 +446,41 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 	};
 
 	let graphics_mode = unsafe { (*graphics).mode };
-	// let graphics_max_mode = unsafe { (*graphics_mode).max_mode };
-	// let mut query_mode = 0;
-	// let (mut mode, mut w, mut h, mut format) = (0, 0, 0, GraphicsPixelFormat::RED_GREEN_BLUE_RESERVED_8BIT_PER_COLOR);
-	// while query_mode < graphics_max_mode {
-	// 	let mut size = 0;
-	// 	let mut ptr = ptr::null();
-	// 	let status = unsafe { ((*graphics).query_mode)(graphics, query_mode, &mut size, &mut ptr) };
-	// 	match status {
-	// 		Status::SUCCESS => println(format_args!("Successfully queried mode {mode}")),
-	// 		e => {
-	// 			println(format_args!("Expected Success but got {e} instead"));
-	// 			continue;
-	// 		},
-	// 	}
-	// 	let info = unsafe { *ptr };
-	// 	if w < info.horizontal_resolution {
-	// 		w = info.horizontal_resolution;
-	// 		h = info.vertical_resolution;
-	// 		format = info.pixel_format;
-	// 		mode = query_mode;
-	// 	}
-	// 	println(format_args!("{info:?}"));
-	// 	query_mode += 1;
-	// }
-	// let status = unsafe { ((*graphics).set_mode)(graphics, mode) };
-	// if status != Status::SUCCESS {
-	// 	panic!("Couldn't Set Mode {mode}");
-	// }
+	let graphics_max_mode = unsafe { (*graphics_mode).max_mode };
+	let mut query_mode = 0;
+	let (mut mode, mut w, mut h, mut pix_per_scan, mut format) = (0, 0, 0, 0, GraphicsPixelFormat::RED_GREEN_BLUE_RESERVED_8BIT_PER_COLOR);
+
+	while query_mode < graphics_max_mode {
+		let mut size = 0;
+		let mut ptr = ptr::null();
+		let status = unsafe { ((*graphics).query_mode)(graphics, query_mode, &mut size, &mut ptr) };
+		match status {
+			Status::SUCCESS => println(format_args!("Successfully queried mode {mode}")),
+			e => {
+				println(format_args!("Expected Success but got {e} instead"));
+				continue;
+			},
+		}
+		let info = unsafe { *ptr };
+		if (w <= info.horizontal_resolution && h <= info.vertical_resolution) && (info.horizontal_resolution <= 1920 && info.vertical_resolution <= 1080) {
+			w = info.horizontal_resolution;
+			h = info.vertical_resolution;
+			format = info.pixel_format;
+			pix_per_scan = info.pixels_per_scanline;
+			mode = query_mode;
+		}
+		println(format_args!("{info:?}"));
+		query_mode += 1;
+	}
+
+	let status = unsafe { ((*graphics).set_mode)(graphics, mode) };
+	if status != Status::SUCCESS {
+		panic!("Couldn't Set Mode {mode}");
+	}
 
 	let graphics_ptr = unsafe { (*graphics_mode).framebuffer_base }.to_ptr();
-	let graphics_len = unsafe { (*graphics_mode).framebuffer_size } / size_of::<GraphicsPixel>();
-	let pix_per_scan = unsafe { (*(*graphics_mode).info).pixels_per_scanline };
+	let graphics_len = w as usize * h as usize * size_of::<GraphicsPixel>();
+
 	let screen = unsafe { slice::from_raw_parts_mut(graphics_ptr, graphics_len) };
 
 	let mask = PixelBitmask::new(0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
@@ -525,36 +536,50 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 	match unsafe { ((*system_table.boot_services).exit_boot_services)(image_handle, map_key) } {
 		Status::SUCCESS => {
 			println(format_args!("Exit Boot Services Succeeded!"));
-			for i in 0..memory_map_size / descriptor_size {
-				let descriptor = unsafe { (memory_map.add(i * descriptor_size) as *mut MemoryDescriptor).as_mut_unchecked() };
-				match descriptor.region_type {
-					KERNEL_PAGE => {},
-					STACK_PAGE => {
-						descriptor.virtual_start = VirtualAddress::new(0xFFFFFFFFFFFFF000);
-					},
-					TRAMPOLINE_PAGE => {
-						descriptor.virtual_start = VirtualAddress::new(trampoline_page.get());
-					},
-					MemoryType::RUNTIME_SERVICES_DATA => {},
-					MemoryType::RUNTIME_SERVICES_CODE => {},
-					_ => {},
-				}
-				println(format_args!("{descriptor:#X?}"));
-			}
+			// for i in 0..memory_map_size / descriptor_size {
+			// 	let descriptor = unsafe { (memory_map.add(i * descriptor_size) as *mut MemoryDescriptor).as_mut_unchecked() };
+			// 	match descriptor.region_type {
+			// 		KERNEL_PAGE => {},
+			// 		STACK_PAGE => {
+			// 			descriptor.virtual_start = VirtualAddress::new(0xFFFFFFFFFFFFFFFF - ((stack_page_number << 12) - 1) as u64);
+			// 		},
+			// 		TRAMPOLINE_PAGE => {
+			// 			descriptor.virtual_start = VirtualAddress::new(trampoline_page.get());
+			// 		},
+			// 		MemoryType::RUNTIME_SERVICES_DATA => {},
+			// 		MemoryType::RUNTIME_SERVICES_CODE => {},
+			// 		_ => {},
+			// 	}
+			// 	println(format_args!("{descriptor:#X?}"));
+			// }
 
 			// let status = unsafe { ((*system_table.runtime_services).set_virtual_address_map)(memory_map_size, descriptor_size, descriptor_version, memory_map as *const MemoryDescriptor) };
 			// if status != Status::SUCCESS {
 			// 	panic!("Expected panic for setting virtual address map");
 			// }
 
-			let _header = boot_info::KernelDataHeader {
+			let header = boot_info::KernelDataHeader {
 				graphics_len,
 				graphics_ptr,
+				graphics_format: format,
 				root_system_description_pointer,
 				root_system_description_pointer_ex,
-				system_table: Some(system_table),
+				system_table: (*system_table).clone(),
 				virtual_mappings_count: pages_loaded,
 			};
+			let header_ptr = ((stack_pages.get() as usize + (stack_page_number << 12) - size_of::<boot_info::KernelDataHeader>()) & !(16 - 1)) as *mut boot_info::KernelDataHeader;
+			unsafe {
+				header_ptr.write_unaligned(header);
+			};
+			// for j in 0..stack_page_number {
+			// 	for i in 0..PAGE_SIZE {
+			// 		// # Safety:
+			// 		let b = unsafe { *stack_pages.to_ptr::<u8>().add(i + (j << 12)) };
+			// 		print(format_args!("{b:02X} "));
+			// 	}
+			// 	println(format_args!(""));
+			// }
+
 			let start = ptr::null::<u8>();
 			let end = ptr::null::<u8>();
 			let size = 0usize;
@@ -566,13 +591,14 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 					"jmp 3f",
 					"2:",
 					"mov cr3, {address_space}",
-					"xor rsp, rsp",
+					"mov rsp, {header_ptr}",
 					"jmp {kernel_entry}",
 					"4:",
 					"jmp 4b",
 					"3:",
 					"mov {size}, {end}",
 					"sub {size}, {start}",
+					"inc {size}",
 					"mov rsi, {start}",
 					"mov rdi, {trampoline}",
 					"mov rcx, {size}",
@@ -584,19 +610,16 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 					trampoline = in(reg) trampoline_page.to_ptr::<u8>(),
 					address_space = in(reg) address_space.get_ptr(),
 					kernel_entry = in(reg) kernel_entry.as_ptr().add(base_address as usize),
-					options(noreturn)
+					// TODO: I need to figure out why I need this 16 byte offset to get the correct
+					// value?
+					header_ptr = in(reg) 0usize.overflowing_sub(size_of::<boot_info::KernelDataHeader>() + 16).0,
+					options(noreturn, nostack),
 				)
 			}
 		},
 		Status::INVALID_PARAMETER => {
 			println(format_args!("Exit Boot Services Failed!"));
-			let num_descriptors = memory_map_size / descriptor_size;
-			for i in 0..num_descriptors {
-				let descriptor = unsafe { &*((memory_map as *mut u8).add(i * descriptor_size) as *mut MemoryDescriptor) };
-				println(format_args!("{descriptor:?}"));
-			}
-
-			println(format_args!("Memory Map Pointer: {memory_map:X?}"));
+			println(format_args!("Memory Map Pointer: {memory_map:#X?}"));
 			println(format_args!("Memory Map Key: {map_key}"));
 			println(format_args!("Memory Map Size: {memory_map_size}"));
 			println(format_args!("Memory Map Descriptor Size: {descriptor_size}"));
