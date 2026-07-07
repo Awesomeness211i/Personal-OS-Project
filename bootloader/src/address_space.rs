@@ -128,8 +128,8 @@ impl AddressSpace {
 		let page_middle_directory_entry =
 			Self::get_entry(page_upper_directory_entry.to_addr(), page_middle_directory_index).expect("Until I figure out how to deal with less than exactly 4 tables this is expected");
 
-		let page_table = Self::get_entry(page_middle_directory_entry.to_addr(), page_table_index).expect("Until I figure out how to deal with less than exactly 4 tables this is expected");
-		PhysicalAddress::new((page_table.to_addr() as *const _ as u64) | vaddr_offset)
+		let page_table_entry = Self::get_entry(page_middle_directory_entry.to_addr(), page_table_index).expect("Until I figure out how to deal with less than exactly 4 tables this is expected");
+		PhysicalAddress::new((page_table_entry.to_addr() as *const _ as u64) | vaddr_offset)
 	}
 
 	fn get_entry(ptr: *const Table, table_index: usize) -> Result<Entry, ()> {
