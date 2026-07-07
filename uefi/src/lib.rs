@@ -27,6 +27,14 @@ use core::{
 pub use chars::Char16;
 pub use strings::CStr16;
 
+pub struct BootServices {
+	_private: (),
+}
+
+pub struct RuntimeServices {
+	_private: (),
+}
+
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
 pub struct SystemTablePointer(&'static tables::SystemTable);

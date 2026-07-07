@@ -76,6 +76,7 @@ impl<const SIZE: usize> IndexMut<usize> for Page<SIZE> {
 	}
 }
 
+#[repr(C)]
 #[derive(Debug)]
 pub struct AddressSpace {
 	ptr: PhysicalAddress,
@@ -87,11 +88,11 @@ impl AddressSpace {
 	pub const ADDRESS_SPACE: MemoryType = MemoryType::custom_os(0x80000003);
 	pub fn create(levels: u8) -> Self {
 		// # Safety:
-		let ptr = unsafe { SYSTEM_TABLE_POINTER }.expect("System Table Pointer uninitialized");
+		let ptr = unsafe { SYSTEM_TABLE_POINTER.expect("System Table Pointer uninitialized").boot_services };
 		let num_pages = 1;
 		let mut paddr = PhysicalAddress::new(0);
 		// # Safety:
-		let status = unsafe { ((*ptr.boot_services).allocate_pages)(AllocateType::ANY_PAGES, MemoryType::LOADER_DATA, num_pages, &mut paddr) };
+		let status = unsafe { ((*ptr).allocate_pages)(AllocateType::ANY_PAGES, MemoryType::LOADER_DATA, num_pages, &mut paddr) };
 		if status != Status::SUCCESS {
 			panic!("Failed to allocate address space with error: {status}")
 		} else {

@@ -4,6 +4,7 @@ use core::fmt::{
 	Write,
 };
 
+// TODO: Actually make this something that works correctly
 #[repr(transparent)]
 pub struct Port(u16);
 

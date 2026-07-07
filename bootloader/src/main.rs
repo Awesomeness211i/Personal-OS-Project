@@ -4,6 +4,8 @@
 //! # BOOTLOADER
 //! Starting executable file for the UEFI bootloader for my hobby OS project.
 
+// #![feature(uefi_std)]
+
 use core::{
 	self,
 	ffi::c_void,
@@ -12,6 +14,10 @@ use core::{
 	slice,
 };
 
+use acpi::{
+	RootSystemDescriptionPointer,
+	RootSystemDescriptionPointerEx,
+};
 use arch::x86_64::paging::EntryFlags;
 use bootloader::{
 	PAGE_SIZE,
@@ -120,6 +126,7 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 	unsafe { ((*system_table.console_out).reset)(system_table.console_out, true) };
 	unsafe { ((*system_table.std_err).reset)(system_table.std_err, true) };
 	unsafe { ((*system_table.console_in).reset)(system_table.console_in, true) };
+	println(format_args!("{system_table:#X?}"));
 
 	// Disable watchdog timer
 	// unsafe { ((*system_table.boot_services).set_watchdog_timer)(0, 0, 0, None) };
@@ -403,8 +410,8 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 	// 4E28CA50-D582-44AC-A11F-E3D56526DB34
 	// C451ED2B-9694-45D3-BABA-ED9F8988A389
 	let config_tables = unsafe { core::slice::from_raw_parts(system_table.configuration_tables, system_table.num_table_entries) };
-	let mut root_system_description_pointer = None;
-	let mut root_system_description_pointer_ex = None;
+	let mut root_system_description_pointer = RootSystemDescriptionPointer::default();
+	let mut root_system_description_pointer_ex = RootSystemDescriptionPointerEx::default();
 	for table in config_tables {
 		println(format_args!("{table:?}"));
 		match table.vendor_guid {
@@ -415,7 +422,7 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 					println(format_args!("Not an ACPI20 table?"));
 					return Status::ABORTED;
 				}
-				root_system_description_pointer_ex = Some(t);
+				root_system_description_pointer_ex = t;
 			},
 			ConfigurationTable::ACPI_10_TABLE => {
 				let acpi_table = table.vendor_table as *const acpi::RootSystemDescriptionPointer;
@@ -424,7 +431,7 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 					println(format_args!("Not an ACPI10 table?"));
 					return Status::ABORTED;
 				}
-				root_system_description_pointer = Some(t);
+				root_system_description_pointer = t;
 			},
 			ConfigurationTable::SMBIOS_TABLE => {
 				// let smbios = table.vendortable as *const SMBIOSTable_64;
@@ -558,6 +565,13 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 			// 	panic!("Expected panic for setting virtual address map");
 			// }
 
+			let address_space_ptr = address_space.get_ptr();
+			println(format_args!("address space pointer: {address_space_ptr:#X?}"));
+			let header_ptr = ((stack_pages.get() as usize + (stack_page_number << 12) - size_of::<boot_info::KernelDataHeader>()) & !(16 - 1)) as *mut boot_info::KernelDataHeader;
+			// TODO: I need to figure out why I need this byte offset to get the correct value?
+			let addr = 0usize.overflowing_sub(size_of::<boot_info::KernelDataHeader>() + 8).0;
+			let phys_addr = address_space.get_physical_address(VirtualAddress::new(addr as u64));
+
 			let header = boot_info::KernelDataHeader {
 				graphics_len,
 				graphics_ptr,
@@ -565,20 +579,18 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 				root_system_description_pointer,
 				root_system_description_pointer_ex,
 				system_table: (*system_table).clone(),
+				address_space,
 				virtual_mappings_count: pages_loaded,
 			};
-			let header_ptr = ((stack_pages.get() as usize + (stack_page_number << 12) - size_of::<boot_info::KernelDataHeader>()) & !(16 - 1)) as *mut boot_info::KernelDataHeader;
 			unsafe {
-				header_ptr.write_unaligned(header);
+				header_ptr.write(header);
 			};
-			// for j in 0..stack_page_number {
-			// 	for i in 0..PAGE_SIZE {
-			// 		// # Safety:
-			// 		let b = unsafe { *stack_pages.to_ptr::<u8>().add(i + (j << 12)) };
-			// 		print(format_args!("{b:02X} "));
-			// 	}
-			// 	println(format_args!(""));
-			// }
+			println(format_args!("{header_ptr:#X?}: {addr:#X?}"));
+			for i in 0..size_of::<boot_info::KernelDataHeader>() {
+				let b = unsafe { *phys_addr.to_ptr::<u8>().add(i) };
+				print(format_args!("{b:02X} "));
+			}
+			println(format_args!(""));
 
 			let start = ptr::null::<u8>();
 			let end = ptr::null::<u8>();
@@ -608,11 +620,9 @@ pub extern "efiapi" fn main(image_handle: &mut c_void, system_table: SystemTable
 					end = in(reg) end,
 					size = in(reg) size,
 					trampoline = in(reg) trampoline_page.to_ptr::<u8>(),
-					address_space = in(reg) address_space.get_ptr(),
+					address_space = in(reg) address_space_ptr,
 					kernel_entry = in(reg) kernel_entry.as_ptr().add(base_address as usize),
-					// TODO: I need to figure out why I need this 16 byte offset to get the correct
-					// value?
-					header_ptr = in(reg) 0usize.overflowing_sub(size_of::<boot_info::KernelDataHeader>() + 16).0,
+					header_ptr = in(reg) addr,
 					options(noreturn, nostack),
 				)
 			}

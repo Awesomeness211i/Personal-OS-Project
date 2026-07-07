@@ -15,3 +15,14 @@ pub mod print;
 pub static mut SYSTEM_TABLE_POINTER: Option<SystemTablePointer> = None;
 
 pub const PAGE_SIZE: usize = 4096;
+
+// TODO: Figure out how I want to deal with defining external symbols
+
+// #[unsafe(export_name = "efi_main")]
+// pub extern "efiapi" fn efi_main(image_handle: &mut core::ffi::c_void, system_table: SystemTablePointer) -> uefi::status::Status {
+// 	__user_uefi_main(image_handle, system_table)
+// }
+//
+// unsafe extern "C" {
+// 	safe fn __user_uefi_main(image_handle: &mut core::ffi::c_void, system_table: SystemTablePointer) -> uefi::status::Status;
+// }

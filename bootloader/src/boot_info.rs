@@ -3,6 +3,8 @@ use acpi::{
 	RootSystemDescriptionPointerEx,
 };
 
+use crate::address_space::AddressSpace;
+
 #[repr(C)]
 pub struct SMBIOSTable_64 {
 	pub anchor_string: [u8; 5],
@@ -22,15 +24,16 @@ pub struct MappingInfo {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct KernelDataHeader {
 	/// size of structure in bytes
 	pub graphics_len: usize,
 	pub graphics_ptr: *mut uefi::protocols::graphics::GraphicsPixel,
 	pub graphics_format: uefi::protocols::graphics::GraphicsPixelFormat,
-	pub root_system_description_pointer: Option<RootSystemDescriptionPointer>,
-	pub root_system_description_pointer_ex: Option<RootSystemDescriptionPointerEx>,
+	pub root_system_description_pointer: RootSystemDescriptionPointer,
+	pub root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
 	pub system_table: uefi::tables::SystemTable,
+	pub address_space: AddressSpace,
 	pub virtual_mappings_count: usize,
 	// pub memorymap: uefi::memory::MemoryMap,
 	// pub imagehandle: uefi::Handle,
