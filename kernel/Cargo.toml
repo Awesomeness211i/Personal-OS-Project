@@ -11,5 +11,5 @@ bench = false
 [dependencies]
 # uefi = { path = "../uefi" }
 # acpi = { path = "../acpi" }
-# arch = { path = "../arch" }
+arch = { path = "../arch" }
 bootloader = { path = "../bootloader" }

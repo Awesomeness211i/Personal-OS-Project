@@ -1,4 +1,3 @@
-#![feature(const_trait_impl, const_range, const_cmp, structural_match)]
 #![deny(clippy::undocumented_unsafe_blocks)]
 // #![warn(missing_docs)]
 #![no_std]
@@ -20,29 +19,83 @@ mod strings;
 pub mod tables;
 
 use core::{
-	ffi::c_char,
+	ffi::{
+		c_char,
+		c_void,
+	},
 	fmt::Display,
+	marker::PhantomData,
 };
 
 pub use chars::Char16;
 pub use strings::CStr16;
 
+use crate::status::Status;
+
+#[derive(Debug)]
 pub struct BootServices {
 	_private: (),
 }
-
+#[derive(Debug)]
 pub struct RuntimeServices {
 	_private: (),
+}
+impl private::Sealed for BootServices {}
+impl Services for BootServices {}
+impl private::Sealed for RuntimeServices {}
+impl Services for RuntimeServices {}
+pub trait Services: private::Sealed {}
+mod private {
+	pub trait Sealed {}
 }
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
-pub struct SystemTablePointer(&'static tables::SystemTable);
+pub struct SystemTablePointer<T: Services = BootServices> {
+	table: &'static tables::SystemTable,
+	_phantom: PhantomData<T>,
+}
 
-impl core::ops::Deref for SystemTablePointer {
-	type Target = tables::SystemTable;
-	fn deref(&self) -> &Self::Target {
-		self.0
+impl<T: Services> SystemTablePointer<T> {
+	pub fn header(&self) -> &tables::TableHeader {
+		&self.table.header
+	}
+
+	pub fn config_tables(&self) -> &[tables::ConfigurationTable] {
+		unsafe { core::slice::from_raw_parts(self.table.configuration_tables, self.table.num_table_entries) }
+	}
+
+	pub fn runtime_services(&self) -> &services::RuntimeServices {
+		unsafe { &(*self.table.runtime_services) }
+	}
+}
+
+impl SystemTablePointer<BootServices> {
+	pub fn boot_services(&self) -> &services::BootServices {
+		unsafe { &(*self.table.boot_services) }
+	}
+
+	pub fn console_out(&self) -> &protocols::text::SimpleTextOutputProtocol {
+		unsafe { &*self.table.console_out }
+	}
+
+	pub fn std_err(&self) -> &protocols::text::SimpleTextOutputProtocol {
+		unsafe { &*self.table.std_err }
+	}
+
+	pub fn console_in(&self) -> &protocols::text::SimpleTextInputProtocol {
+		unsafe { &*self.table.console_in }
+	}
+
+	pub fn exit_boot_services(self, image_handle: *mut c_void, mapkey: usize) -> Result<SystemTablePointer<RuntimeServices>, SystemTablePointer<BootServices>> {
+		// # Safety:
+		match unsafe { ((*self.table.boot_services).exit_boot_services)(image_handle, mapkey) } {
+			Status::SUCCESS => Ok(SystemTablePointer {
+				table: self.table,
+				_phantom: PhantomData,
+			}),
+			_ => Err(self),
+		}
 	}
 }
 

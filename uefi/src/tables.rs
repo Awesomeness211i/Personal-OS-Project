@@ -33,7 +33,7 @@ pub mod TableStates {
 pub struct TableHeader {
 	pub signature: u64,
 	pub revision: u32,
-	pub headersize: u32,
+	pub header_size: u32,
 	pub crc32: u32,
 	reserved: u32,
 }

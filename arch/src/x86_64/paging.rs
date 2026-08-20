@@ -9,12 +9,6 @@ use core::{
 	},
 };
 
-pub enum EntrySize {
-	FourKiB,
-	TwoMiB,
-	OneGiB,
-}
-
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct EntryFlags(u64);
@@ -80,15 +74,15 @@ impl BitOr for EntryFlags {
 pub struct Entry(u64);
 
 impl Entry {
-	pub unsafe fn new(entry: u64) -> Self {
+	pub const unsafe fn new(entry: u64) -> Self {
 		Self(entry)
 	}
 
-	pub fn exists(&self) -> bool {
+	pub const fn exists(&self) -> bool {
 		self.0 & EntryFlags::PRESENT.0 != 0
 	}
 
-	pub fn get_flags(&self) -> EntryFlags {
+	pub const fn get_flags(&self) -> EntryFlags {
 		EntryFlags(self.0 & !Self::PHYSICAL_ADDRESS)
 	}
 
@@ -106,9 +100,16 @@ impl Entry {
 }
 
 #[repr(C, align(4096))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Table<const ENTRY_NUM: usize = 512> {
 	entries: [Entry; ENTRY_NUM],
+}
+
+impl<const ENTRY_NUM: usize> Table<ENTRY_NUM> {
+	pub const fn new() -> Self {
+		const EMPTY: Entry = unsafe { Entry::new(0) };
+		Self { entries: [EMPTY; ENTRY_NUM] }
+	}
 }
 
 impl<const ENTRY_NUM: usize> Table<ENTRY_NUM> {

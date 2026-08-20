@@ -1,7 +1,4 @@
-use core::{
-	fmt::Debug,
-	marker::StructuralPartialEq,
-};
+use core::fmt::Debug;
 
 use super::{
 	PhysicalAddress,
@@ -75,22 +72,22 @@ impl Attribute {
 /// use. MemoryType values in the range 0x80000000..0xFFFFFFFF are reserved for use by UEFI OS loaders that
 /// are provided by operating system vendors.
 #[repr(transparent)]
-#[derive(Clone, Copy, Default, Eq)]
+#[derive(Clone, Copy, Default, PartialOrd, PartialEq, Eq)]
 pub struct MemoryType(u32);
 
-impl StructuralPartialEq for MemoryType {}
-
-impl const PartialEq for MemoryType {
-	fn eq(&self, other: &Self) -> bool {
-		self.0.eq(&other.0)
-	}
-}
-
-impl const PartialOrd for MemoryType {
-	fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-		self.0.partial_cmp(&other.0)
-	}
-}
+// impl StructuralPartialEq for MemoryType {}
+//
+// impl PartialEq for MemoryType {
+// 	fn eq(&self, other: &Self) -> bool {
+// 		self.0.eq(&other.0)
+// 	}
+// }
+//
+// impl const PartialOrd for MemoryType {
+// 	fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+// 		self.0.partial_cmp(&other.0)
+// 	}
+// }
 
 impl Debug for MemoryType {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -140,12 +137,12 @@ impl MemoryType {
 	pub const OS_RESERVED: core::ops::RangeInclusive<Self> = Self(0x8000_0000)..=Self(0xFFFF_FFFF);
 	pub const fn custom_oem(value: u32) -> Self {
 		let result = Self(value);
-		assert!(Self::OEM_RESERVED.contains(&result));
+		// assert!(Self::OEM_RESERVED.contains(&result));
 		result
 	}
 	pub const fn custom_os(value: u32) -> Self {
 		let result = Self(value);
-		assert!(Self::OS_RESERVED.contains(&result));
+		// assert!(Self::OS_RESERVED.contains(&result));
 		result
 	}
 	pub const fn get(&self) -> u32 {

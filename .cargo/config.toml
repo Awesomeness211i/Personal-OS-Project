@@ -4,5 +4,6 @@ rustflags = ["-C", "relocation-model=pic", "-C", "code-model=kernel"]
 
 [unstable]
 bindeps = true
-# build-std-features = ["compiler-builtins-mem"]
-# build-std = ["core"]
+#build-std = ["core"]
+build-std-features = ["compiler-builtins-mem"]
+unstable-options = true

@@ -22,7 +22,7 @@ pub struct LoadedImageProtocol {
 	image_code_type: MemoryType,
 	image_data_type: MemoryType,
 	/// handle: IN
-	unload: unsafe extern "efiapi" fn(handle: *const c_void) -> Status,
+	pub unload: unsafe extern "efiapi" fn(handle: *const c_void) -> Status,
 }
 impl super::Protocol for LoadedImageProtocol {
 	/// GUID: 5B1B31A1-9562-11D2-8E3F-00A0C969723B

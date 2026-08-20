@@ -149,13 +149,13 @@ pub struct BootServices {
 		imagehandle: *mut *mut c_void,
 	) -> Status,
 	/// imagehandle: IN, exitdatasize: OUT, exitdata: OUT
-	pub start_image: unsafe extern "efiapi" fn(imagehandle: *mut c_void, exitdatasize: *mut usize, exitdata: *mut *const Char16) -> Status,
+	pub start_image: unsafe extern "efiapi" fn(image_handle: *mut c_void, exitdatasize: *mut usize, exitdata: *mut *const Char16) -> Status,
 	/// imagehandle: IN, exitstatus: IN, exitdatasize: IN, exitdata: IN
-	pub exit: unsafe extern "efiapi" fn(imagehandle: *mut c_void, exitstatus: Status, exitdatasize: usize, exitdata: *const Char16) -> Status,
+	pub exit: unsafe extern "efiapi" fn(image_handle: *mut c_void, exitstatus: Status, exitdatasize: usize, exitdata: *const Char16) -> Status,
 	/// imagehandle: IN
-	pub unload_image: unsafe extern "efiapi" fn(imagehandle: *mut c_void) -> Status,
+	pub unload_image: unsafe extern "efiapi" fn(image_handle: *mut c_void) -> Status,
 	/// imagehandle: IN, mapkey: IN
-	pub exit_boot_services: unsafe extern "efiapi" fn(imagehandle: *mut c_void, mapkey: usize) -> Status,
+	pub exit_boot_services: unsafe extern "efiapi" fn(image_handle: *mut c_void, mapkey: usize) -> Status,
 	/// count: OUT
 	pub get_next_monotonic_count: unsafe extern "efiapi" fn(count: *mut u64) -> Status,
 	/// microseconds: IN

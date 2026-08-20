@@ -16,31 +16,46 @@ pub struct SMBIOSTable_64 {
 	pub structure_table_address: u64,
 }
 
-#[repr(C)]
-pub struct MappingInfo {
-	pub physical_address: uefi::PhysicalAddress,
-	pub virtual_address: uefi::VirtualAddress,
-	pub len: usize,
+// #[repr(C)]
+// pub struct MappingInfo {
+// 	pub physical_address: uefi::PhysicalAddress,
+// 	pub virtual_address: uefi::VirtualAddress,
+// 	pub len: usize,
+// }
+
+#[non_exhaustive]
+#[repr(C, usize)]
+#[derive(Debug)]
+pub enum KernelData {
+	V1 {
+		/// Size of this structure in bytes
+		size: usize,
+		stack_page_count: usize,
+		trampoline_page: uefi::PhysicalAddress,
+		system_table: uefi::SystemTablePointer<uefi::RuntimeServices>,
+		root_system_description_pointer: RootSystemDescriptionPointer,
+		root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
+	},
 }
 
 #[repr(C)]
 #[derive(Debug)]
 pub struct KernelDataHeader {
+	pub graphics_format: uefi::protocols::graphics::GraphicsPixelFormat,
+	pub graphics_ptr: *mut uefi::protocols::graphics::GraphicsPixel,
 	/// size of structure in bytes
 	pub graphics_len: usize,
-	pub graphics_ptr: *mut uefi::protocols::graphics::GraphicsPixel,
-	pub graphics_format: uefi::protocols::graphics::GraphicsPixelFormat,
 	pub root_system_description_pointer: RootSystemDescriptionPointer,
 	pub root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
 	pub system_table: uefi::tables::SystemTable,
 	pub address_space: AddressSpace,
+	pub stack_page_count: usize,
 	pub virtual_mappings_count: usize,
-	// pub memorymap: uefi::memory::MemoryMap,
-	// pub imagehandle: uefi::Handle,
+	pub trampoline_page: uefi::PhysicalAddress,
 }
 
-#[repr(C)]
-pub struct KernelData {
-	pub header: KernelDataHeader,
-	pub virtual_mappings: [MappingInfo],
-}
+// #[repr(C)]
+// pub struct KernelData {
+// 	pub header: KernelDataHeader,
+// 	pub virtual_mappings: [MappingInfo],
+// }
