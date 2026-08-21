@@ -5,6 +5,7 @@ use core::{
 		Display,
 		Formatter,
 	},
+	marker::PhantomData,
 	num,
 	ops,
 	ptr,
@@ -44,7 +45,10 @@ impl Display for ELFError {
 }
 impl Error for ELFError {}
 
-pub struct Elf<'a>(&'a mut [u8]);
+pub struct Elf<'a> {
+	file: &'a mut [u8],
+}
+
 impl Elf<'_> {
 	pub fn new(ptr: *mut u8, len: usize) -> Result<Self, ELFError> {
 		let Some(ptr) = ptr::NonNull::new(ptr) else {
@@ -107,13 +111,49 @@ impl Elf<'_> {
 
 		// Safety:
 		// After all the checks we do it should eventually be safe
-		Ok(Self(unsafe { slice::from_raw_parts_mut(ptr.as_ptr(), len) }))
+		Ok(Self {
+			file: unsafe { slice::from_raw_parts_mut(ptr.as_ptr(), len) },
+		})
 	}
 
 	pub fn header(&self) -> &ElfHeader {
 		// Safety:
 		// Should be safe after the creation of this object succeeds
-		unsafe { &*(self.0.as_ptr() as *const ElfHeader) }
+		unsafe { &*(self.file.as_ptr() as *const ElfHeader) }
+	}
+
+	pub unsafe fn offset<T>(&self, offset: usize) -> &T {
+		unsafe { &*(self.file.as_ptr().add(offset) as *const T) }
+	}
+
+	pub fn program_headers<'a>(&'a self) -> ProgramHeaderIterator<'a> {
+		ProgramHeaderIterator {
+			ptr: unsafe { self.file.as_ptr().add(self.header().program_header_offset.expect("Haven't handled this case yet").get()) },
+			size: self.header().program_header_entry_size as usize,
+			count: self.header().program_header_num.expect("Haven't handled this case yet").get() as usize,
+			i: 0,
+			_phantom: PhantomData,
+		}
+	}
+}
+
+pub struct ProgramHeaderIterator<'a> {
+	ptr: *const u8,
+	size: usize,
+	count: usize,
+	i: usize,
+	_phantom: PhantomData<&'a Elf64ProgramHeader>,
+}
+
+impl<'a> Iterator for ProgramHeaderIterator<'a> {
+	type Item = &'a Elf64ProgramHeader;
+	fn next(&mut self) -> Option<Self::Item> {
+		if self.i < self.count {
+			self.i += 1;
+			Some(unsafe { &*(self.ptr.add(self.i * self.size) as *const Elf64ProgramHeader) })
+		} else {
+			None
+		}
 	}
 }
 

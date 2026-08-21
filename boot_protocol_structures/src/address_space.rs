@@ -3,20 +3,20 @@ use core::ops::{
 	IndexMut,
 };
 
-use arch::x86_64::paging::{
-	Entry,
-	EntryFlags,
-	Table,
+use arch::x86_64::{
+	PAGE_SIZE,
+	paging::{
+		Entry,
+		EntryFlags,
+		Table,
+	},
 };
 use uefi::{
 	PhysicalAddress,
 	VirtualAddress,
 };
 
-use crate::{
-	PAGE_SIZE,
-	print::println,
-};
+use crate::debug_print::println;
 
 #[repr(C, align(4096))]
 #[derive(Debug)]
@@ -157,7 +157,7 @@ impl AddressSpace {
 			panic!("Trying to map a page twice to the same entry seems problematic")
 		} else {
 			println(format_args!(
-				"{paddr:#X} -> {:#X}: {page_global_directory_index} {page_upper_directory_index} {page_middle_directory_index} {page_table_index}",
+				"{paddr:#X} -> {:#X}: {page_global_directory_index} {page_upper_directory_index} {page_middle_directory_index} {page_table_index} {flags:X?}",
 				vaddr.get() & !0xFFF
 			));
 			// for i in 0..PAGE_SIZE {

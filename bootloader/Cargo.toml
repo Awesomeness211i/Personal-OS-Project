@@ -16,3 +16,5 @@ bench = false
 uefi = { path = "../uefi" }
 arch = { path = "../arch" }
 acpi = { path = "../acpi" }
+elf = { path = "../elf" }
+boot_protocol_structures = { path = "../boot_protocol_structures" }

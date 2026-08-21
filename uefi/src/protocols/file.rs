@@ -54,14 +54,19 @@ impl FileSystemVolumeLabel {
 }
 
 #[repr(C)]
-pub struct FileInfo {
-	pub size: u64,
+pub struct FileInfoHeader {
+	pub struct_size: u64,
 	pub file_size: u64,
 	pub physical_size: u64,
 	pub create_time: Time,
 	pub last_access_time: Time,
 	pub modification_time: Time,
 	pub attribute: u64,
+}
+
+#[repr(C)]
+pub struct FileInfo {
+	pub header: FileInfoHeader,
 	pub file_name: CStr16,
 }
 impl FileInfo {

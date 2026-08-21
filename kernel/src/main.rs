@@ -5,16 +5,16 @@
 //! # KERNEL
 //! Starting executable file for the kernel for my hobby OS project.
 
-use bootloader::{
-	boot_info,
-	print::{
-		print,
-		println,
-	},
+use boot_protocol_structures::debug_print::{
+	print,
+	println,
 };
 
 #[unsafe(no_mangle)]
-extern "C" fn _start(data: boot_info::KernelDataHeader) -> ! {
+unsafe extern "C" fn _start(data: &boot_protocol_structures::KernelDataStruct) -> ! {
+	println(format_args!("Hello Kernel!"));
+	println(format_args!("{data:#X?}"));
+
 	// let kernel_table_pointer = unsafe { &raw mut GLOBAL_PAGE_TABLE.kernel };
 	// let mut global_page_table = Table::<512>::new();
 	// for entry in unsafe { global_page_table.get_entries() } {}

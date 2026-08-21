@@ -30,6 +30,8 @@ pub struct GDTTable {
 	tss_high: GDTEntry,
 }
 
+pub const PAGE_SIZE: usize = 4096;
+
 /// This is a thin wrapper function around the cli x86_64 instruction and the only difference
 ///
 /// # Safety

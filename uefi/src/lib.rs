@@ -331,6 +331,9 @@ impl VirtualAddress {
 	pub fn get(&self) -> u64 {
 		self.0
 	}
+	pub const fn to_ptr<T>(&self) -> *mut T {
+		self.0 as *mut T
+	}
 }
 
 impl core::fmt::LowerHex for VirtualAddress {

@@ -1,0 +1,10 @@
+[package]
+name = "boot_protocol_structures"
+version = "0.1.0"
+edition = "2024"
+
+
+[dependencies]
+uefi = { path = "../uefi" }
+arch = { path = "../arch" }
+acpi = { path = "../acpi" }

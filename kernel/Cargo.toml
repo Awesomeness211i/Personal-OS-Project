@@ -9,7 +9,6 @@ test = false
 bench = false
 
 [dependencies]
-# uefi = { path = "../uefi" }
-# acpi = { path = "../acpi" }
 arch = { path = "../arch" }
 bootloader = { path = "../bootloader" }
+boot_protocol_structures = { path = "../boot_protocol_structures" }
