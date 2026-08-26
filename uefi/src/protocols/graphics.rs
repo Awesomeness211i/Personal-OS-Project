@@ -1,6 +1,10 @@
 use crate::{
 	GUID,
 	PhysicalAddress,
+	protocols::{
+		HasGUID,
+		Protocol,
+	},
 	status::Status,
 };
 
@@ -55,7 +59,8 @@ impl GraphicsOutputProtocol {
 		}
 	}
 }
-impl super::Protocol for GraphicsOutputProtocol {
+unsafe impl Protocol for GraphicsOutputProtocol {}
+impl HasGUID for GraphicsOutputProtocol {
 	/// GUID: 9042A9DE-23DC-4A38-96FB-7ADED080516A
 	const GUID: GUID = GUID::new(0x9042A9DE, 0x23DC, 0x4A38, 0x96FB_7ADED080516A);
 }

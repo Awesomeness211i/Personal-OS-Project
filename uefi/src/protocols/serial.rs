@@ -1,7 +1,8 @@
 use super::{
-	Protocol,
 	GUID,
+	Protocol,
 };
+use crate::protocols::HasGUID;
 
 #[repr(C)]
 pub struct SerialIOProtocol {
@@ -21,7 +22,8 @@ pub struct SerialIOProtocol {
 	pub mode: *mut SerialIOMode,
 	pub device_type_guid: *const GUID,
 }
-impl Protocol for SerialIOProtocol {
+unsafe impl Protocol for SerialIOProtocol {}
+impl HasGUID for SerialIOProtocol {
 	/// GUID: BB25CF6F-F1D4-11D2-9A0C-0090273FC1FD
 	const GUID: GUID = GUID::new(0xBB25CF6F, 0xF1D4, 0x11D2, 0x9A0C_0090273FC1FD);
 }
@@ -78,7 +80,7 @@ pub enum ParityType {
 #[repr(C)]
 pub enum StopBitsType {
 	DefaultStopBits,
-	OneStopBit, // 1 stop bit
+	OneStopBit,      // 1 stop bit
 	OneFiveStopBits, // 1.5 stop bits
-	TwoStopBits, // 2 stop bits
+	TwoStopBits,     // 2 stop bits
 }

@@ -6,13 +6,12 @@ use crate::{
 	Event,
 	GUID,
 	PhysicalAddress,
-
 	memory::{
 		MemoryDescriptor,
 		MemoryType,
 	},
 	protocols::{
-		// Protocol,
+		Protocol,
 		path::DevicePathProtocol,
 	},
 	status::Status,
@@ -259,17 +258,14 @@ impl BootServices {
 		// todo
 		unsafe { (self.wait_for_event)(events.len(), events.as_ptr(), &mut index) }.into_result(index)
 	}
-	// pub fn handle_protocol<T: Protocol>(&self, handle: *mut ()) -> Result<*mut ()<T>, Status> {
-	// 	let mut interface = core::ptr::null();
-	// 	// SAFETY:
-	// 	// Should be safe because to call this we need a valid implementation of Protocol and even
-	// 	// if you implement Protocol on an invalid structure this should be fine because we check
-	// 	// the Status returned by handleprotocol
-	// 	unsafe { (self.handle_protocol)(handle, &T::GUID, &mut interface) }
-	// 		// SAFETY:
-	// 		// Should be safe because we got back a valid interface from a valid protocol
-	// 		.map(|| unsafe { *mut ()::new_unchecked(interface as *mut T) })
-	// }
+	pub fn handle_protocol<T: Protocol>(&self, handle: *mut c_void) -> Result<&mut T, Status> {
+		let mut interface = core::ptr::null();
+		// SAFETY:
+		// Should be safe because to call this we need a valid implementation of Protocol and even
+		// if you implement Protocol on an invalid structure this should be fine because we check
+		// the Status returned by handleprotocol
+		unsafe { (self.handle_protocol)(handle, &T::GUID, &mut interface).map(|| &mut *(interface as *mut T)) }
+	}
 	// pub fn stall(&self, microseconds: usize) -> Result<(), Status> {
 	// 	// SAFETY:
 	// 	unsafe { (self.stall)(microseconds) }.into_result(())

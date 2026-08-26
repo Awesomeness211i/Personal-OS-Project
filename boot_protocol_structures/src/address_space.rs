@@ -73,14 +73,16 @@ impl<const SIZE: usize> IndexMut<usize> for Page<SIZE> {
 #[derive(Debug, Clone)]
 pub struct AddressSpace {
 	ptr: PhysicalAddress,
+	virtual_ptr: VirtualAddress,
 	next_allocation_index: usize,
 	page_count: usize,
 	// TODO: Actually use this field to map things properly
 	levels: u8,
+	is_virtual: bool,
 }
 
 impl AddressSpace {
-	pub fn create(paddr: PhysicalAddress, page_count: usize, levels: u8) -> Self {
+	pub fn create(paddr: PhysicalAddress, vaddr: VirtualAddress, page_count: usize, levels: u8) -> Self {
 		assert!(page_count > 0);
 		// # Safety:
 		unsafe {
@@ -88,14 +90,24 @@ impl AddressSpace {
 		}
 		Self {
 			ptr: paddr,
+			virtual_ptr: vaddr,
 			next_allocation_index: 1,
 			page_count,
 			levels,
+			is_virtual: false,
 		}
 	}
 
-	pub fn get_ptr(&self) -> *mut Page {
-		self.ptr.to_ptr::<Page>()
+	pub fn switch_to_virtual(&mut self) {
+		self.is_virtual = true;
+	}
+
+	pub fn get_ptr<T>(&self) -> *mut T {
+		if self.is_virtual { self.virtual_ptr.to_ptr::<T>() } else { self.ptr.to_ptr::<T>() }
+	}
+
+	pub fn get_page_count(&self) -> usize {
+		self.page_count
 	}
 
 	fn get_entry(ptr: *const Table, table_index: usize) -> Result<Entry, ()> {
@@ -118,7 +130,7 @@ impl AddressSpace {
 			Ok(entry) => entry,
 			Err(_) => {
 				if self.next_allocation_index < self.page_count {
-					let page_table_allocation = unsafe { self.ptr.to_ptr::<Page>().add(self.next_allocation_index) };
+					let page_table_allocation = unsafe { self.get_ptr::<Page>().add(self.next_allocation_index) };
 					println(format_args!("Page Table Allocation Address: {page_table_allocation:#X?}"));
 
 					self.next_allocation_index += 1;
@@ -147,7 +159,7 @@ impl AddressSpace {
 		let page_global_directory_index = (vaddr_no_offset >> (9 * 3)) & index_mask;
 
 		// for i in 0..self.levels {}
-		let mut page_global_directory_entry = self.get_or_create_entry(self.ptr.to_ptr::<Table>(), page_global_directory_index, parent_flags);
+		let mut page_global_directory_entry = self.get_or_create_entry(self.get_ptr::<Table>(), page_global_directory_index, parent_flags);
 		let mut page_upper_directory_entry = self.get_or_create_entry(page_global_directory_entry.to_mut_addr(), page_upper_directory_index, parent_flags);
 		let mut page_middle_directory_entry = self.get_or_create_entry(page_upper_directory_entry.to_mut_addr(), page_middle_directory_index, parent_flags);
 

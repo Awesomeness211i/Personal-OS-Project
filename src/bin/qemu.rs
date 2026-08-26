@@ -14,6 +14,8 @@ fn main() -> Result<(), std::io::Error> {
 		.arg(format!("format=raw,file={uefi_path}"))
 		.arg("-serial")
 		.arg("stdio")
+		// .arg("-s")
+		// .arg("-S")
 		.status()?;
 	#[cfg(target_arch = "aarch64")]
 	let exit_status = std::process::Command::new("qemu-system-arm")

@@ -12,6 +12,8 @@ use acpi::{
 	RootSystemDescriptionPointerEx,
 };
 
+use crate::address_space::AddressSpace;
+
 #[non_exhaustive]
 #[repr(C, usize)]
 #[derive(Debug)]
@@ -23,6 +25,7 @@ pub enum KernelData {
 		memory_map: *mut c_void,
 		stack_page_count: usize,
 		trampoline_page: uefi::PhysicalAddress,
+		address_space: AddressSpace,
 		system_table: uefi::SystemTablePointer<uefi::RuntimeServices>,
 		root_system_description_pointer: RootSystemDescriptionPointer,
 		root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
@@ -33,31 +36,32 @@ pub enum KernelData {
 #[repr(C)]
 #[derive(Debug)]
 pub struct KernelDataStruct {
-	version_tag: usize,
-	size: usize,
-	memory_map: *mut c_void,
-	stack_page_count: usize,
-	trampoline_page: uefi::PhysicalAddress,
-	system_table: uefi::SystemTablePointer<uefi::RuntimeServices>,
-	root_system_description_pointer: RootSystemDescriptionPointer,
-	root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct KernelDataHeader {
-	pub graphics_format: uefi::protocols::graphics::GraphicsPixelFormat,
-	pub graphics_ptr: *mut uefi::protocols::graphics::GraphicsPixel,
-	/// size of structure in bytes
-	pub graphics_len: usize,
+	pub version_tag: usize,
+	pub size: usize,
+	pub memory_map: *mut c_void,
+	pub stack_page_count: usize,
+	pub trampoline_page: uefi::PhysicalAddress,
+	pub address_space: AddressSpace,
+	pub system_table: uefi::SystemTablePointer<uefi::RuntimeServices>,
 	pub root_system_description_pointer: RootSystemDescriptionPointer,
 	pub root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
-	pub system_table: uefi::tables::SystemTable,
-	pub address_space: address_space::AddressSpace,
-	pub stack_page_count: usize,
-	pub virtual_mappings_count: usize,
-	pub trampoline_page: uefi::PhysicalAddress,
 }
+
+// #[repr(C)]
+// #[derive(Debug)]
+// pub struct KernelDataHeader {
+// 	pub graphics_format: uefi::protocols::graphics::GraphicsPixelFormat,
+// 	pub graphics_ptr: *mut uefi::protocols::graphics::GraphicsPixel,
+// 	/// size of structure in bytes
+// 	pub graphics_len: usize,
+// 	pub root_system_description_pointer: RootSystemDescriptionPointer,
+// 	pub root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
+// 	pub system_table: uefi::tables::SystemTable,
+// 	pub address_space: address_space::AddressSpace,
+// 	pub stack_page_count: usize,
+// 	pub virtual_mappings_count: usize,
+// 	pub trampoline_page: uefi::PhysicalAddress,
+// }
 
 #[repr(C)]
 pub struct SMBIOSTable_64 {

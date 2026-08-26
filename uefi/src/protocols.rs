@@ -17,9 +17,7 @@ pub trait HasGUID {
 	const GUID: GUID;
 }
 
-pub trait Protocol {
-	const GUID: GUID;
-}
+pub unsafe trait Protocol: HasGUID {}
 
 #[repr(C)]
 pub struct DecompressProtocol {
@@ -28,10 +26,11 @@ pub struct DecompressProtocol {
 	/// this: IN, source: IN, sourcesize: IN, destination: IN OUT, destinationsize: IN, scratch: IN OUT, scratchsize: IN
 	pub decompress: unsafe extern "efiapi" fn(this: *const Self, source: *const (), sourcesize: u32, destination: *mut (), destinationsize: u32, scratch: *mut (), scratchsize: u32) -> Status,
 }
-impl Protocol for DecompressProtocol {
+impl HasGUID for DecompressProtocol {
 	/// GUID: D8117CFE-94A6-11D4-9A3A-0090273FC14D
 	const GUID: GUID = GUID::new(0xD8117CFE, 0x94A6, 0x11D4, 0x9A3A_0090273FC14D);
 }
+unsafe impl Protocol for DecompressProtocol {}
 
 #[repr(C)]
 pub struct BootManagerPolicyProtocol {
@@ -41,7 +40,8 @@ pub struct BootManagerPolicyProtocol {
 	/// this: IN, class: IN
 	pub connectdeviceclass: unsafe extern "efiapi" fn(this: *const Self, class: *const GUID) -> Status,
 }
-impl Protocol for BootManagerPolicyProtocol {
+impl HasGUID for BootManagerPolicyProtocol {
 	/// GUID: FEDF8E0C-E147-11E3-9903-B8E8562CBAFA
 	const GUID: GUID = GUID::new(0xFEDF8E0C, 0xE147, 0x11E3, 0x9903_B8E8562CBAFA);
 }
+unsafe impl Protocol for BootManagerPolicyProtocol {}

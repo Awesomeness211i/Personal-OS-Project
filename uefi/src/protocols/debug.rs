@@ -1,5 +1,6 @@
 use crate::{
 	GUID,
+	protocols::HasGUID,
 	status::Status,
 };
 
@@ -35,16 +36,72 @@ impl SystemContextEBC {
 #[repr(C)]
 pub struct SystemContextRiscV<T> {
 	// integer registers
-	zero: T, ra: T, sp: T, gp: T, tp: T, t0: T, t1: T, t2: T,
-	s0fp: T, s1: T, a0: T, a1: T, a2: T, a3: T, a4: T, a5: T, a6: T, a7: T,
-	s2: T, s3: T, s4: T, s5: T, s6: T, s7: T, s8: T, s9: T, s10: T, s11: T,
-	t3: T, t4: T, t5: T, t6: T,
+	zero: T,
+	ra: T,
+	sp: T,
+	gp: T,
+	tp: T,
+	t0: T,
+	t1: T,
+	t2: T,
+	s0fp: T,
+	s1: T,
+	a0: T,
+	a1: T,
+	a2: T,
+	a3: T,
+	a4: T,
+	a5: T,
+	a6: T,
+	a7: T,
+	s2: T,
+	s3: T,
+	s4: T,
+	s5: T,
+	s6: T,
+	s7: T,
+	s8: T,
+	s9: T,
+	s10: T,
+	s11: T,
+	t3: T,
+	t4: T,
+	t5: T,
+	t6: T,
 
 	// Floating registers for F, D and Q Standard Extensions
-	ft0: u128, ft1: u128, ft2: u128, ft3: u128, ft4: u128, ft5: u128, ft6: u128, ft7: u128,
-	fs0: u128, fs1: u128, fa0: u128, fa1: u128, fa2: u128, fa3: u128, fa4: u128, fa5: u128, fa6: u128, fa7: u128,
-	fs2: u128, fs3: u128, fs4: u128, fs5: u128, fs6: u128, fs7: u128, fs8: u128, fs9: u128, fs10: u128, fs11: u128,
-	ft8: u128, ft9: u128, ft10: u128, ft11: u128,
+	ft0: u128,
+	ft1: u128,
+	ft2: u128,
+	ft3: u128,
+	ft4: u128,
+	ft5: u128,
+	ft6: u128,
+	ft7: u128,
+	fs0: u128,
+	fs1: u128,
+	fa0: u128,
+	fa1: u128,
+	fa2: u128,
+	fa3: u128,
+	fa4: u128,
+	fa5: u128,
+	fa6: u128,
+	fa7: u128,
+	fs2: u128,
+	fs3: u128,
+	fs4: u128,
+	fs5: u128,
+	fs6: u128,
+	fs7: u128,
+	fs8: u128,
+	fs9: u128,
+	fs10: u128,
+	fs11: u128,
+	ft8: u128,
+	ft9: u128,
+	ft10: u128,
+	ft11: u128,
 }
 impl<T> SystemContextRiscV<T> {
 	pub const EXCEPT_INST_MISALIGNED: isize = 0;
@@ -74,7 +131,8 @@ impl<T> SystemContextRiscV<T> {
 #[derive(Clone, Copy)]
 struct Ia32 {
 	eip: u32,
-	cs: u16, reserved1: u16,
+	cs: u16,
+	reserved1: u16,
 	dataoffset: u32,
 	ds: u16,
 	reserved2: [u8; 10],
@@ -96,16 +154,27 @@ union State {
 
 #[repr(C)]
 pub struct FXSaveState {
-	fcw: u16, fsw: u16, ftw: u16, opcode: u16,
+	fcw: u16,
+	fsw: u16,
+	ftw: u16,
+	opcode: u16,
 	specific: State,
-	st0mm0: [u8; 10], reserved3: [u8; 6],
-	st1mm1: [u8; 10], reserved4: [u8; 6],
-	st2mm2: [u8; 10], reserved5: [u8; 6],
-	st3mm3: [u8; 10], reserved6: [u8; 6],
-	st4mm4: [u8; 10], reserved7: [u8; 6],
-	st5mm5: [u8; 10], reserved8: [u8; 6],
-	st6mm6: [u8; 10], reserved9: [u8; 6],
-	st7mm7: [u8; 10], reserved10: [u8; 6],
+	st0mm0: [u8; 10],
+	reserved3: [u8; 6],
+	st1mm1: [u8; 10],
+	reserved4: [u8; 6],
+	st2mm2: [u8; 10],
+	reserved5: [u8; 6],
+	st3mm3: [u8; 10],
+	reserved6: [u8; 6],
+	st4mm4: [u8; 10],
+	reserved7: [u8; 6],
+	st5mm5: [u8; 10],
+	reserved8: [u8; 6],
+	st6mm6: [u8; 10],
+	reserved9: [u8; 6],
+	st7mm7: [u8; 10],
+	reserved10: [u8; 6],
 	xmm0: [u8; 16],
 	xmm1: [u8; 16],
 	xmm2: [u8; 16],
@@ -122,14 +191,39 @@ pub struct SystemContextIa32 {
 	exceptiondata: u32,
 	fxsavestate: FXSaveState,
 
-	dr0: u32, dr1: u32, dr2: u32, dr3: u32, dr4: u32, dr5: u32, dr6: u32, dr7: u32,
-	cr0: u32, cr1: u32, cr2: u32, cr3: u32, cr4: u32,
+	dr0: u32,
+	dr1: u32,
+	dr2: u32,
+	dr3: u32,
+	dr4: u32,
+	dr5: u32,
+	dr6: u32,
+	dr7: u32,
+	cr0: u32,
+	cr1: u32,
+	cr2: u32,
+	cr3: u32,
+	cr4: u32,
 	eflags: u32,
-	ldtr: u32, tr: u32,
-	gdtr: [u32; 2], idtr: [u32; 2],
+	ldtr: u32,
+	tr: u32,
+	gdtr: [u32; 2],
+	idtr: [u32; 2],
 	eip: u32,
-	gs: u32, fs: u32, es: u32, ds: u32, cs: u32, ss: u32,
-	edi: u32, esi: u32, ebp: u32, esp: u32, ebx: u32, edx: u32, ecx: u32, eax: u32,
+	gs: u32,
+	fs: u32,
+	es: u32,
+	ds: u32,
+	cs: u32,
+	ss: u32,
+	edi: u32,
+	esi: u32,
+	ebp: u32,
+	esp: u32,
+	ebx: u32,
+	edx: u32,
+	ecx: u32,
+	eax: u32,
 }
 
 /// exceptiontype: IN, systemcontext: IN OUT
@@ -147,7 +241,8 @@ pub struct DebugSupportProtocol {
 	/// this: IN, processorindex: IN, start: IN, length: IN
 	invalidateinstructioncache: unsafe extern "efiapi" fn(this: *const Self, processorindex: usize, start: *const (), length: u64) -> Status,
 }
-impl super::Protocol for DebugSupportProtocol {
+unsafe impl super::Protocol for DebugSupportProtocol {}
+impl HasGUID for DebugSupportProtocol {
 	const GUID: GUID = GUID::new(0x2755590C, 0x6F3C, 0x42FA, 0x9EA4_A3BA543CDA25);
 }
 
@@ -162,7 +257,8 @@ pub struct DebugPortProtocol {
 	/// this: IN
 	poll: unsafe extern "efiapi" fn(this: *const Self),
 }
-impl super::Protocol for DebugPortProtocol {
+unsafe impl super::Protocol for DebugPortProtocol {}
+impl HasGUID for DebugPortProtocol {
 	const GUID: GUID = GUID::new(0xEBA4E8D2, 0x3858, 0x41EC, 0xA281_2647BA9660D0);
 }
 

@@ -4,6 +4,10 @@ use crate::{
 	Bool,
 	Char16,
 	GUID,
+	protocols::{
+		HasGUID,
+		Protocol,
+	},
 	status::Status,
 };
 
@@ -30,19 +34,21 @@ pub struct UnicodeCollationProtocol {
 	string_to_fat: unsafe extern "efiapi" fn(this: *const Self, string: *const Char16, fat_size: usize, fat: *mut c_char) -> Bool,
 	supported_languages: *const c_char,
 }
-impl UnicodeCollationProtocol {}
-impl super::Protocol for UnicodeCollationProtocol {
+unsafe impl Protocol for UnicodeCollationProtocol {}
+impl HasGUID for UnicodeCollationProtocol {
 	/// GUID: A4C751FC-23AE-4C3E-92E9-4964CF63F349
 	const GUID: GUID = GUID::new(0xA4C751FC, 0x23AE, 0x4C3E, 0x92E9_4964CF63F349);
 }
+impl UnicodeCollationProtocol {}
 
 #[repr(C)]
 pub struct RegularExpressionProtocol {
 	match_string: unsafe extern "efiapi" fn(this: *const Self) -> Status,
 	get_info: unsafe extern "efiapi" fn(this: *const Self) -> Status,
 }
-impl RegularExpressionProtocol {}
-impl super::Protocol for RegularExpressionProtocol {
+unsafe impl Protocol for RegularExpressionProtocol {}
+impl HasGUID for RegularExpressionProtocol {
 	/// GUID: B3F79D9A-436C-DC11-B052-CD85DF524CE6
 	const GUID: GUID = GUID::new(0xB3F79D9A, 0x436C, 0xDC11, 0xB052_CD85DF524CE6);
 }
+impl RegularExpressionProtocol {}

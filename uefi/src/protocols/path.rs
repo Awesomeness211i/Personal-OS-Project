@@ -1,10 +1,14 @@
 use crate::{
-	GUID,
 	Bool,
-	MacAddress,
+	GUID,
 	IpV4Address,
 	IpV6Address,
+	MacAddress,
 	memory::MemoryType,
+	protocols::{
+		HasGUID,
+		Protocol,
+	},
 };
 
 #[repr(C, u8)]
@@ -18,7 +22,8 @@ pub enum DevicePathProtocol {
 	BiosBootSpec(bios_boot_spec::Type) = 0x05,
 	EndHardware(EndHardwareType) = 0x7F,
 }
-impl super::Protocol for DevicePathProtocol {
+unsafe impl Protocol for DevicePathProtocol {}
+impl HasGUID for DevicePathProtocol {
 	/// GUID: 09576E91-6D3F-11D2-8E39-00A0C969723B
 	const GUID: GUID = GUID::new(0x09576E91, 0x6D3F, 0x11D2, 0x8E39_00A0C969723B);
 }
@@ -42,7 +47,8 @@ pub struct DevicePathUtilitiesProtocol {
 	/// nodetype: IN, nodesubtype: IN, nodelength: IN
 	create_device_node: unsafe extern "efiapi" fn(node_type: u8, node_subtype: u8, node_length: u16) -> *const DevicePathProtocol,
 }
-impl super::Protocol for DevicePathUtilitiesProtocol {
+unsafe impl Protocol for DevicePathUtilitiesProtocol {}
+impl HasGUID for DevicePathUtilitiesProtocol {
 	/// GUID: 0379BE4E-D706-437D-B037-EDB82FB772A4
 	const GUID: GUID = GUID::new(0x0379BE4E, 0xD706, 0x437D, 0xB037_EDB82FB772A4);
 }
@@ -95,7 +101,7 @@ pub mod hardware {
 	pub struct Vendor {
 		guid: GUID,
 		/// variable length
-		data: [u8; 0]
+		data: [u8; 0],
 	}
 
 	#[repr(C, packed)]
@@ -155,7 +161,6 @@ pub mod acpi {
 	}
 }
 
-
 pub mod messaging {
 	use super::*;
 	#[repr(C, u8)]
@@ -199,8 +204,8 @@ pub mod messaging {
 		pub const PC_ANSI_GUID: GUID = GUID::new(0xE0C14753, 0xF9BE, 0x11D2, 0x9A0C_0090273FC14D);
 		pub const VT_100_GUID: GUID = GUID::new(0xDFA66065, 0xB419, 0x11D3, 0x9A2D_0090273FC14D);
 		pub const VT_100_PLUS_GUID: GUID = GUID::new(0x7BAEC70B, 0x57E0, 0x4C76, 0x8E87_2F9E28088343);
-		pub const VT_UTF8_GUID: GUID = GUID::new(0xAD15A0D6,0x8BEC,0x4ACF,0xA073_D01DE77E2D88);
-		pub const UART_FLOW_CONTROL_GUID: GUID = GUID::new(0x37499A9D,0x542F,0x4C89,0xA026_35DA142094E4);
+		pub const VT_UTF8_GUID: GUID = GUID::new(0xAD15A0D6, 0x8BEC, 0x4ACF, 0xA073_D01DE77E2D88);
+		pub const UART_FLOW_CONTROL_GUID: GUID = GUID::new(0x37499A9D, 0x542F, 0x4C89, 0xA026_35DA142094E4);
 	}
 
 	#[repr(C, packed)]
@@ -267,7 +272,7 @@ pub mod messaging {
 	pub struct MessagingVendor {
 		guid: GUID,
 		/// variable length
-		data: [u8; 0]
+		data: [u8; 0],
 	}
 
 	#[repr(C, packed)]
@@ -476,7 +481,7 @@ pub mod media {
 	#[derive(Clone, Copy, PartialEq, Eq)]
 	pub struct Vendor {
 		guid: GUID,
-		data: [u8; 0]
+		data: [u8; 0],
 	}
 }
 

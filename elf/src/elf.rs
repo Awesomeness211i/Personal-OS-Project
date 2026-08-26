@@ -37,6 +37,7 @@ pub enum ELFError {
 	UnsupportedELFVersion,
 	UnsupportedEndianness,
 	UnsupportedArchitectureWidth,
+	ElfHeaderTooSmall(usize),
 }
 impl Display for ELFError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
@@ -96,7 +97,7 @@ impl Elf<'_> {
 		{
 			return Err(ELFError::Unknown);
 		}
-		if header_ptr.executable_type != ExecutableType::DYNAMIC {
+		if !(header_ptr.executable_type == ExecutableType::DYNAMIC || header_ptr.executable_type == ExecutableType::EXECUTABLE) {
 			return Err(ELFError::UnsupportedExecutableType);
 		}
 		if header_ptr.machine != Machine::X86_64 {
@@ -105,8 +106,8 @@ impl Elf<'_> {
 		if header_ptr.version != 1 {
 			return Err(ELFError::UnsupportedELFVersion);
 		}
-		if header_ptr.elf_header_size as usize != size_of::<ElfHeader>() {
-			return Err(ELFError::UnsupportedELFVersion);
+		if (header_ptr.elf_header_size as usize) < size_of::<ElfHeader>() {
+			return Err(ELFError::ElfHeaderTooSmall(header_ptr.elf_header_size as usize));
 		}
 
 		// Safety:
@@ -120,6 +121,10 @@ impl Elf<'_> {
 		// Safety:
 		// Should be safe after the creation of this object succeeds
 		unsafe { &*(self.file.as_ptr() as *const ElfHeader) }
+	}
+
+	pub fn ptr<T>(&self) -> *const T {
+		self.file.as_ptr() as *const T
 	}
 
 	pub unsafe fn offset<T>(&self, offset: usize) -> &T {
@@ -149,8 +154,9 @@ impl<'a> Iterator for ProgramHeaderIterator<'a> {
 	type Item = &'a Elf64ProgramHeader;
 	fn next(&mut self) -> Option<Self::Item> {
 		if self.i < self.count {
+			let res = Some(unsafe { &*(self.ptr.add(self.i * self.size) as *const Elf64ProgramHeader) });
 			self.i += 1;
-			Some(unsafe { &*(self.ptr.add(self.i * self.size) as *const Elf64ProgramHeader) })
+			res
 		} else {
 			None
 		}
@@ -266,59 +272,6 @@ pub struct ElfHeader {
 	/// If no string table then it is SHN_UNDEF(0) and if entries >= SHN_LORESERVE(0xFF00) then it has the value SHN_XINDEX(0xFFFF) and the actual
 	/// index is in the link field of section header at index 0 otherwise the link field contains 0.
 	pub section_header_string_index: Option<num::NonZeroU16>,
-}
-
-impl ElfHeader {
-	pub fn is_supported_and_valid(&self) -> bool {
-		if self.identifier[..4] != *b"\x7FELF"
-		/* magic */
-		{
-			return false;
-		}
-		if self.identifier[4] != 2
-		/* 64 bit */
-		{
-			return false;
-		}
-		if self.identifier[5] != 1
-		/* little endian */
-		{
-			return false;
-		}
-		if self.identifier[6] != 1
-		/* elf version */
-		{
-			return false;
-		}
-		if self.identifier[7] != 0
-		/* system v */
-		{
-			return false;
-		}
-		if self.identifier[8] != 0
-		/* abi version */
-		{
-			return false;
-		}
-		if self.identifier[9..] != *b"\x00\x00\x00\x00\x00\x00\x00"
-		/* padding */
-		{
-			return false;
-		}
-		if !(self.executable_type == ExecutableType::EXECUTABLE || self.executable_type == ExecutableType::DYNAMIC) {
-			return false;
-		}
-		if self.machine != Machine::X86_64 {
-			return false;
-		}
-		if self.version != 1 {
-			return false;
-		}
-		if self.elf_header_size as usize != size_of::<ElfHeader>() {
-			return false;
-		}
-		true
-	}
 }
 
 #[non_exhaustive]

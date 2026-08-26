@@ -6,6 +6,7 @@ use crate::{
 	Event,
 	GUID,
 	protocols::{
+		HasGUID,
 		Protocol,
 		path::DevicePathProtocol,
 	},
@@ -18,7 +19,8 @@ pub struct LoadFileProtocol {
 	/// this: IN, file_path: IN, boot_policy: IN, buffer_size: IN OUT, buffer: IN
 	pub load_file: unsafe extern "efiapi" fn(this: *const Self, file_path: *const DevicePathProtocol, boot_policy: bool, buffer_size: *mut usize, buffer: Option<core::ptr::NonNull<()>>) -> Status,
 }
-impl Protocol for LoadFileProtocol {
+unsafe impl Protocol for LoadFileProtocol {}
+impl HasGUID for LoadFileProtocol {
 	const GUID: GUID = GUID::new(0x56EC3091, 0x954C, 0x11D2, 0x8E3F_00A0C969723B);
 }
 
@@ -27,7 +29,8 @@ pub struct SimpleFileSystemProtocol {
 	pub revision: u32,
 	pub open_volume: unsafe extern "efiapi" fn(this: *const Self, root: *mut *const FileProtocol) -> Status,
 }
-impl Protocol for SimpleFileSystemProtocol {
+unsafe impl Protocol for SimpleFileSystemProtocol {}
+impl HasGUID for SimpleFileSystemProtocol {
 	/// GUID: 964E5B22-6459-11D2-8E39-00A0C969723B
 	const GUID: GUID = GUID::new(0x964E5B22, 0x6459, 0x11D2, 0x8E39_00A0C969723B);
 }
@@ -49,8 +52,8 @@ impl FileSystemInfo {
 pub struct FileSystemVolumeLabel {
 	pub volumelabel: CStr16,
 }
-impl FileSystemVolumeLabel {
-	pub const GUID: GUID = GUID::new(0xDB47D7D3, 0xFE81, 0x11D3, 0x9A35_0090273FC14D);
+impl HasGUID for FileSystemVolumeLabel {
+	const GUID: GUID = GUID::new(0xDB47D7D3, 0xFE81, 0x11D3, 0x9A35_0090273FC14D);
 }
 
 #[repr(C)]
@@ -69,8 +72,10 @@ pub struct FileInfo {
 	pub header: FileInfoHeader,
 	pub file_name: CStr16,
 }
+impl HasGUID for FileInfo {
+	const GUID: GUID = GUID::new(0x09576E92, 0x6D3F, 0x11D2, 0x8E39_00A0C969723B);
+}
 impl FileInfo {
-	pub const GUID: GUID = GUID::new(0x09576E92, 0x6D3F, 0x11D2, 0x8E39_00A0C969723B);
 	pub const READ_ONLY: u64 = 0x0000000000000001;
 	pub const HIDDEN: u64 = 0x0000000000000002;
 	pub const SYSTEM: u64 = 0x0000000000000004;
@@ -125,6 +130,7 @@ impl FileProtocol {
 	pub const REVISION: u32 = 0x00010000;
 	pub const REVISION2: u32 = 0x00020000;
 	pub const LATEST_REVISION: u32 = Self::REVISION2;
+
 	pub const MODE_READ: u64 = 0x0000000000000001;
 	pub const MODE_WRITE: u64 = 0x0000000000000002;
 	pub const MODE_CREATE: u64 = 0x8000000000000000;
