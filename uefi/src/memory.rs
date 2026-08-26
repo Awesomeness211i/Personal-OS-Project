@@ -75,20 +75,6 @@ impl Attribute {
 #[derive(Clone, Copy, Default, PartialOrd, PartialEq, Eq)]
 pub struct MemoryType(u32);
 
-// impl StructuralPartialEq for MemoryType {}
-//
-// impl PartialEq for MemoryType {
-// 	fn eq(&self, other: &Self) -> bool {
-// 		self.0.eq(&other.0)
-// 	}
-// }
-//
-// impl const PartialOrd for MemoryType {
-// 	fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-// 		self.0.partial_cmp(&other.0)
-// 	}
-// }
-
 impl Debug for MemoryType {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match *self {

@@ -500,7 +500,7 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 		let descriptor = unsafe { (memory_map.add(i * descriptor_size) as *const MemoryDescriptor).read() };
 		println(format_args!("{descriptor:#X?}"));
 		match descriptor.region_type {
-			MemoryType::CONVENTIONAL_MEMORY => {
+			MemoryType::CONVENTIONAL_MEMORY | MemoryType::ACPI_MEMORY_NVS | MemoryType::PERSISTENT_MEMORY => {
 				for j in 0..descriptor.num_pages {
 					kernel_address_space.mmap(
 						VirtualAddress::new(descriptor.virtual_start.get() + (j << 12)),
@@ -520,8 +520,6 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 					);
 				}
 			},
-			MemoryType::ACPI_MEMORY_NVS => {},
-			MemoryType::PERSISTENT_MEMORY => {},
 			KERNEL_PAGE => {
 				let mut used_kernel_pages = 0;
 				for program_header in kernel.program_headers() {
@@ -747,12 +745,15 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 #[panic_handler]
 fn panic(info: &panic::PanicInfo) -> ! {
 	let message = info.message();
-	let location = info.location().unwrap();
-	let file_name = location.file();
-	let line_number = location.line();
-	let column_number = location.column();
-	println(format_args!(
-		"Panicked at: {file_name}\n\tline number: {line_number}\n\tcolumn number: {column_number}\n\tmessage: {message}"
-	));
+	if let Some(location) = info.location() {
+		let file_name = location.file();
+		let line_number = location.line();
+		let column_number = location.column();
+		println(format_args!(
+			"Panicked at: {file_name}\n\tline number: {line_number}\n\tcolumn number: {column_number}\n\tmessage: {message}"
+		));
+	} else {
+		println(format_args!("Panicked: {message}"));
+	}
 	loop {}
 }
