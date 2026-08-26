@@ -85,6 +85,7 @@ impl AddressSpace {
 	pub fn create(paddr: PhysicalAddress, vaddr: VirtualAddress, page_count: usize, levels: u8) -> Self {
 		assert!(page_count > 0);
 		// # Safety:
+		// todo
 		unsafe {
 			paddr.to_ptr::<Page>().write_bytes(0, page_count);
 		}
@@ -135,6 +136,7 @@ impl AddressSpace {
 
 					self.next_allocation_index += 1;
 					// # Safety:
+					// todo
 					unsafe {
 						let entry = Entry::new((page_table_allocation as u64) | flags.get());
 						(&mut *ptr).get_entries()[table_index] = entry.clone();
@@ -172,14 +174,8 @@ impl AddressSpace {
 				"{paddr:#X} -> {:#X}: {page_global_directory_index} {page_upper_directory_index} {page_middle_directory_index} {page_table_index} {flags:X?}",
 				vaddr.get() & !0xFFF
 			));
-			// for i in 0..PAGE_SIZE {
-			// 	// # Safety:
-			// 	let b = unsafe { *paddr.to_ptr::<u8>().add(i) };
-			// 	print(format_args!("{b:02X} "));
-			// }
-			// println(format_args!(""));
-
 			// # Safety:
+			// todo
 			unsafe { page_table.get_entries()[page_table_index] = Entry::new(paddr.get() | flags.get()) }
 		}
 	}

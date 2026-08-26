@@ -88,11 +88,13 @@ impl Entry {
 
 	pub const fn to_addr(&self) -> &Table {
 		// # Safety:
+		// todo
 		unsafe { &*((self.0 & Self::PHYSICAL_ADDRESS) as *const Table) }
 	}
 
 	pub const fn to_mut_addr(&mut self) -> &mut Table {
 		// # Safety:
+		// todo
 		unsafe { &mut *((self.0 & Self::PHYSICAL_ADDRESS) as *mut Table) }
 	}
 

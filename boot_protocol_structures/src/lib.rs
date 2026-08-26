@@ -37,6 +37,7 @@ pub enum KernelData {
 #[derive(Debug)]
 pub struct KernelDataStruct {
 	pub version_tag: usize,
+	/// Size of this structure in bytes
 	pub size: usize,
 	pub memory_map: *mut c_void,
 	pub stack_page_count: usize,

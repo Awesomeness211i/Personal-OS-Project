@@ -1,6 +1,7 @@
 // #![warn(missing_docs)]
 #![no_main]
 #![no_std]
+// #![deny(clippy::undocumented_unsafe_blocks)]
 //! # BOOTLOADER
 //! Starting executable file for the UEFI bootloader for my hobby OS project.
 
