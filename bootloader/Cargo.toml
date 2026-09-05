@@ -7,10 +7,6 @@ edition = "2024"
 name = "bootloader"
 test = false
 bench = false
-# required-features = ["bootloader"]
-
-# [features]
-# bootloader = []
 
 [dependencies]
 uefi = { path = "../uefi" }

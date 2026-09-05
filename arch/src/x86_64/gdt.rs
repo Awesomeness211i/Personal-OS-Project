@@ -1,5 +1,6 @@
 #[repr(C)]
-pub struct GDTEntry {
+#[derive(Debug, Clone)]
+pub struct GdtEntry {
 	limit: u16,
 	base_15_0: u16,
 	base23_16: u8,
@@ -8,16 +9,8 @@ pub struct GDTEntry {
 	base31_24: u8,
 }
 
-#[repr(C, align(4096))]
-pub struct GDTTable {
-	null: GDTEntry,
-	kernel_code: GDTEntry,
-	kernel_data: GDTEntry,
-	null2: GDTEntry,
-	user_data: GDTEntry,
-	user_code: GDTEntry,
-	ovmf_data: GDTEntry,
-	ovmf_code: GDTEntry,
-	tss_low: GDTEntry,
-	tss_high: GDTEntry,
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct GdtTable<const MAX: usize = 512> {
+	entries: [GdtEntry; MAX],
 }

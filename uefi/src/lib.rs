@@ -58,15 +58,15 @@ pub struct SystemTablePointer<T: Services = BootServices> {
 
 impl<T: Services> SystemTablePointer<T> {
 	pub fn header(&self) -> &tables::TableHeader {
-		&self.table.header
+		self.table.header()
 	}
 
 	pub fn config_tables(&self) -> &[tables::ConfigurationTable] {
-		unsafe { core::slice::from_raw_parts(self.table.configuration_tables, self.table.num_table_entries) }
+		self.table.config_tables()
 	}
 
 	pub fn runtime_services(&self) -> &services::RuntimeServices {
-		unsafe { &(*self.table.runtime_services) }
+		self.table.runtime_services()
 	}
 }
 
@@ -87,8 +87,9 @@ impl SystemTablePointer<BootServices> {
 		unsafe { &*self.table.console_in }
 	}
 
-	pub fn exit_boot_services(self, image_handle: *mut c_void, mapkey: usize) -> Result<SystemTablePointer<RuntimeServices>, SystemTablePointer<BootServices>> {
+	pub fn exit_boot_services(self, image_handle: *mut c_void, mapkey: usize) -> Result<SystemTablePointer<RuntimeServices>, Self> {
 		// # Safety:
+		// todo
 		match unsafe { ((*self.table.boot_services).exit_boot_services)(image_handle, mapkey) } {
 			Status::SUCCESS => Ok(SystemTablePointer {
 				table: self.table,

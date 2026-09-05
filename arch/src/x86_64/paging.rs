@@ -74,7 +74,7 @@ impl BitOr for EntryFlags {
 pub struct Entry(u64);
 
 impl Entry {
-	pub const unsafe fn new(entry: u64) -> Self {
+	pub const fn new(entry: u64) -> Self {
 		Self(entry)
 	}
 
@@ -109,7 +109,7 @@ pub struct Table<const ENTRY_NUM: usize = 512> {
 
 impl<const ENTRY_NUM: usize> Table<ENTRY_NUM> {
 	pub const fn new() -> Self {
-		const EMPTY: Entry = unsafe { Entry::new(0) };
+		const EMPTY: Entry = Entry::new(0);
 		Self { entries: [EMPTY; ENTRY_NUM] }
 	}
 }

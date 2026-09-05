@@ -3,6 +3,7 @@ pub mod idt;
 pub mod paging;
 
 #[repr(C, packed)]
+#[derive(Debug)]
 pub struct DescriptorTablePointer {
 	pub limit: u16,
 	pub address: u64,

@@ -8,21 +8,10 @@ use crate::{
 	protocols::{
 		HasGUID,
 		Protocol,
-		path::DevicePathProtocol,
 	},
 	status::Status,
 	tables::Time,
 };
-
-#[repr(C)]
-pub struct LoadFileProtocol {
-	/// this: IN, file_path: IN, boot_policy: IN, buffer_size: IN OUT, buffer: IN
-	pub load_file: unsafe extern "efiapi" fn(this: *const Self, file_path: *const DevicePathProtocol, boot_policy: bool, buffer_size: *mut usize, buffer: Option<core::ptr::NonNull<()>>) -> Status,
-}
-unsafe impl Protocol for LoadFileProtocol {}
-impl HasGUID for LoadFileProtocol {
-	const GUID: GUID = GUID::new(0x56EC3091, 0x954C, 0x11D2, 0x8E3F_00A0C969723B);
-}
 
 #[repr(C)]
 pub struct SimpleFileSystemProtocol {

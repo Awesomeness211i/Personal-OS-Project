@@ -135,10 +135,10 @@ impl AddressSpace {
 					println(format_args!("Page Table Allocation Address: {page_table_allocation:#X?}"));
 
 					self.next_allocation_index += 1;
+					let entry = Entry::new((page_table_allocation as u64) | flags.get());
 					// # Safety:
 					// todo
 					unsafe {
-						let entry = Entry::new((page_table_allocation as u64) | flags.get());
 						(&mut *ptr).get_entries()[table_index] = entry.clone();
 						entry
 					}
@@ -170,10 +170,10 @@ impl AddressSpace {
 		if page_table.entries()[page_table_index].exists() {
 			panic!("Trying to map a page twice to the same entry seems problematic")
 		} else {
-			println(format_args!(
-				"{paddr:#X} -> {:#X}: {page_global_directory_index} {page_upper_directory_index} {page_middle_directory_index} {page_table_index} {flags:X?}",
-				vaddr.get() & !0xFFF
-			));
+			// println(format_args!(
+			// 	"{paddr:#X} -> {:#X}: {page_global_directory_index} {page_upper_directory_index} {page_middle_directory_index} {page_table_index} {flags:X?}",
+			// 	vaddr.get() & !0xFFF
+			// ));
 			// # Safety:
 			// todo
 			unsafe { page_table.get_entries()[page_table_index] = Entry::new(paddr.get() | flags.get()) }

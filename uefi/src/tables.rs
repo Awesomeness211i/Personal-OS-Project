@@ -203,19 +203,19 @@ impl ConformanceProfilesTable {
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct SystemTable {
-	pub header: TableHeader,
+	header: TableHeader,
 	firmware_vendor: *const Char16,
-	pub firmware_revision: u32,
+	firmware_revision: u32,
 	pub console_in_handle: *const (),
 	pub console_in: *const text::SimpleTextInputProtocol,
 	pub console_out_handle: *const (),
 	pub console_out: *const text::SimpleTextOutputProtocol,
 	pub std_err_handle: *const (),
 	pub std_err: *const text::SimpleTextOutputProtocol,
-	pub runtime_services: *const services::RuntimeServices,
+	runtime_services: *const services::RuntimeServices,
 	pub boot_services: *const services::BootServices,
-	pub num_table_entries: usize,
-	pub configuration_tables: *const ConfigurationTable,
+	num_table_entries: usize,
+	configuration_tables: *const ConfigurationTable,
 }
 impl SystemTable {
 	pub const SIGNATURE: u64 = 0x5453595320494249;
@@ -236,6 +236,26 @@ impl SystemTable {
 	pub const REVISION_1_10: u64 = ((1 << 16) | 10);
 	pub const REVISION_1_02: u64 = ((1 << 16) | 2);
 	pub const SPECIFICATION_VERSION: u64 = Self::REVISION;
+
+	pub fn header(&self) -> &TableHeader {
+		&self.header
+	}
+
+	pub fn firmware_vendor(&self) -> *const Char16 {
+		self.firmware_vendor
+	}
+
+	pub fn firmware_revision(&self) -> u32 {
+		self.firmware_revision
+	}
+
+	pub fn config_tables(&self) -> &[ConfigurationTable] {
+		unsafe { core::slice::from_raw_parts(self.configuration_tables, self.num_table_entries) }
+	}
+
+	pub fn runtime_services(&self) -> &services::RuntimeServices {
+		unsafe { &(*self.runtime_services) }
+	}
 }
 
 #[repr(C)]
