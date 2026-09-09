@@ -213,7 +213,7 @@ pub struct SystemTable {
 	pub std_err_handle: *const (),
 	pub std_err: *const text::SimpleTextOutputProtocol,
 	runtime_services: *const services::RuntimeServices,
-	pub boot_services: *const services::BootServices,
+	boot_services: *const services::BootServices,
 	num_table_entries: usize,
 	configuration_tables: *const ConfigurationTable,
 }
@@ -237,23 +237,27 @@ impl SystemTable {
 	pub const REVISION_1_02: u64 = ((1 << 16) | 2);
 	pub const SPECIFICATION_VERSION: u64 = Self::REVISION;
 
-	pub fn header(&self) -> &TableHeader {
+	pub(crate) fn header(&self) -> &TableHeader {
 		&self.header
 	}
 
-	pub fn firmware_vendor(&self) -> *const Char16 {
+	pub(crate) fn firmware_vendor(&self) -> *const Char16 {
 		self.firmware_vendor
 	}
 
-	pub fn firmware_revision(&self) -> u32 {
+	pub(crate) fn firmware_revision(&self) -> u32 {
 		self.firmware_revision
 	}
 
-	pub fn config_tables(&self) -> &[ConfigurationTable] {
+	pub(crate) fn config_tables(&self) -> &[ConfigurationTable] {
 		unsafe { core::slice::from_raw_parts(self.configuration_tables, self.num_table_entries) }
 	}
 
-	pub fn runtime_services(&self) -> &services::RuntimeServices {
+	pub(crate) fn boot_services(&self) -> &services::BootServices {
+		unsafe { &(*self.boot_services) }
+	}
+
+	pub(crate) fn runtime_services(&self) -> &services::RuntimeServices {
 		unsafe { &(*self.runtime_services) }
 	}
 }

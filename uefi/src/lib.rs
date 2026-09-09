@@ -1,6 +1,7 @@
 #![deny(clippy::undocumented_unsafe_blocks)]
 // #![warn(missing_docs)]
 #![no_std]
+// #![feature(const_range, const_trait_impl)]
 //! # UEFI
 //! Library for interfacing with the UEFI specification
 
@@ -30,7 +31,10 @@ use core::{
 pub use chars::Char16;
 pub use strings::CStr16;
 
-use crate::status::Status;
+use crate::{
+	memory::MemoryMap,
+	status::Status,
+};
 
 #[derive(Debug)]
 pub struct BootServices {
@@ -72,7 +76,7 @@ impl<T: Services> SystemTablePointer<T> {
 
 impl SystemTablePointer<BootServices> {
 	pub fn boot_services(&self) -> &services::BootServices {
-		unsafe { &(*self.table.boot_services) }
+		self.table.boot_services()
 	}
 
 	pub fn console_out(&self) -> &protocols::text::SimpleTextOutputProtocol {
@@ -87,10 +91,10 @@ impl SystemTablePointer<BootServices> {
 		unsafe { &*self.table.console_in }
 	}
 
-	pub fn exit_boot_services(self, image_handle: *mut c_void, mapkey: usize) -> Result<SystemTablePointer<RuntimeServices>, Self> {
+	pub fn exit_boot_services(self, image_handle: *mut c_void, memory_map: &MemoryMap) -> Result<SystemTablePointer<RuntimeServices>, Self> {
 		// # Safety:
 		// todo
-		match unsafe { ((*self.table.boot_services).exit_boot_services)(image_handle, mapkey) } {
+		match unsafe { (self.table.boot_services().exit_boot_services)(image_handle, memory_map.map_key) } {
 			Status::SUCCESS => Ok(SystemTablePointer {
 				table: self.table,
 				_phantom: PhantomData,

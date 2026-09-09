@@ -14,32 +14,17 @@ use acpi::{
 
 use crate::address_space::AddressSpace;
 
-#[non_exhaustive]
-#[repr(C, usize)]
-#[derive(Debug)]
-pub enum KernelData {
-	Unknown = 0,
-	V1 {
-		/// Size of this structure in bytes
-		size: usize,
-		memory_map: *mut c_void,
-		stack_page_count: usize,
-		trampoline_page: uefi::PhysicalAddress,
-		address_space: AddressSpace,
-		system_table: uefi::SystemTablePointer<uefi::RuntimeServices>,
-		root_system_description_pointer: RootSystemDescriptionPointer,
-		root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
-	} = 1,
-	MaxSupportedVersion,
-}
-
 #[repr(C)]
 #[derive(Debug)]
-pub struct KernelDataStruct {
+pub struct KernelData {
 	pub version_tag: usize,
 	/// Size of this structure in bytes
 	pub size: usize,
 	pub memory_map: *mut c_void,
+	pub descriptor_size: usize,
+	pub memory_map_size: usize,
+	pub map_key: usize,
+	pub descriptor_version: u32,
 	pub stack_page_count: usize,
 	pub trampoline_page: uefi::PhysicalAddress,
 	pub address_space: AddressSpace,
@@ -48,21 +33,9 @@ pub struct KernelDataStruct {
 	pub root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
 }
 
-// #[repr(C)]
-// #[derive(Debug)]
-// pub struct KernelDataHeader {
-// 	pub graphics_format: uefi::protocols::graphics::GraphicsPixelFormat,
-// 	pub graphics_ptr: *mut uefi::protocols::graphics::GraphicsPixel,
-// 	/// size of structure in bytes
-// 	pub graphics_len: usize,
-// 	pub root_system_description_pointer: RootSystemDescriptionPointer,
-// 	pub root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
-// 	pub system_table: uefi::tables::SystemTable,
-// 	pub address_space: address_space::AddressSpace,
-// 	pub stack_page_count: usize,
-// 	pub virtual_mappings_count: usize,
-// 	pub trampoline_page: uefi::PhysicalAddress,
-// }
+impl KernelData {
+	pub const CURRENT_VERSION: usize = 1;
+}
 
 #[repr(C)]
 pub struct SMBIOSTable_64 {

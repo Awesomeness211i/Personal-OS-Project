@@ -69,12 +69,14 @@ impl Status {
 			_ => Err(self),
 		}
 	}
+
 	pub fn map<T, F: FnOnce() -> T>(self, op: F) -> Result<T, Self> {
 		match self {
 			Self::SUCCESS => Ok(op()),
 			_ => Err(self),
 		}
 	}
+
 	pub const SUCCESS: Status = Status(0);
 
 	pub const UNKNOWN_GLYPH: Status = Status(Warn::UnknownGlyph as usize);

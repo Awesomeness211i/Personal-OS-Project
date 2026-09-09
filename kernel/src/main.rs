@@ -19,7 +19,7 @@ use boot_protocol_structures::debug_print::println;
 // extern crate alloc;
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn _start(data: &boot_protocol_structures::KernelDataStruct) -> ! {
+unsafe extern "C" fn _start(data: &boot_protocol_structures::KernelData) -> ! {
 	println(format_args!("Hello Kernel!"));
 	println(format_args!("{data:#X?}"));
 

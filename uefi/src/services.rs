@@ -1,4 +1,7 @@
-use core::ffi::c_void;
+use core::{
+	ffi::c_void,
+	ptr,
+};
 
 use crate::{
 	Bool,
@@ -8,7 +11,9 @@ use crate::{
 	PhysicalAddress,
 	memory::{
 		MemoryDescriptor,
+		MemoryMap,
 		MemoryType,
+		Pool,
 	},
 	protocols::Protocol,
 	status::Status,
@@ -68,22 +73,26 @@ impl LocateSearchType {
 pub struct BootServices {
 	pub header: TableHeader,
 	/// newtpl: IN
-	pub raise_tpl: unsafe extern "efiapi" fn(newtpl: TaskPriorityLevel) -> TaskPriorityLevel,
+	raise_tpl: unsafe extern "efiapi" fn(newtpl: TaskPriorityLevel) -> TaskPriorityLevel,
 	/// oldtpl: IN
-	pub restore_tpl: unsafe extern "efiapi" fn(oldtpl: TaskPriorityLevel),
+	restore_tpl: unsafe extern "efiapi" fn(oldtpl: TaskPriorityLevel),
 	/// allocate_type: IN
 	/// Allocation requests of Type AllocateAnyPages allocate any available range of pages that satisfies the request. On input, the address pointed to by Memory is ignored.
 	/// Allocation requests of Type AllocateMaxAddress allocate any available range of pages whose uppermost address is less than or equal to the address pointed to by Memory on input.
 	/// Allocation requests of Type AllocateAddress allocate pages at the address pointed to by Memory on input.
+	///
 	/// memory_type: IN
 	/// The type of memory to allocate.
 	/// These memory types are also described in more detail in Memory Type Usage before ExitBootServices(), and
 	/// Memory Type Usage after ExitBootServices() . Normal allocations (that is, allocations by any UEFI application)
 	/// are of type EfiLoaderData.
+	///
 	/// pages: IN
 	/// The number of contiguous 4 KiB pages to allocate.
+	///
 	/// memory: IN OUT
 	/// On input, the way in which the address is used depends on the value of allocate_type. On output the address is set to the base of the page range that was allocated.
+	///
 	/// Status can return:
 	/// SUCCESS
 	/// OUT_OF_RESOURCES
@@ -96,9 +105,9 @@ pub struct BootServices {
 	pub get_memory_map: unsafe extern "efiapi" fn(memorymapsize: *mut usize, memorymap: *mut MemoryDescriptor, mapkey: *mut usize, descriptorsize: *mut usize, descriptorversion: *mut u32) -> Status,
 	/// pooltype: IN, size: IN, buffer: OUT
 	/// size in bytes
-	pub allocate_pool: unsafe extern "efiapi" fn(pooltype: MemoryType, size: usize, buffer: *mut *mut c_void) -> Status,
+	allocate_pool: unsafe extern "efiapi" fn(pooltype: MemoryType, size: usize, buffer: *mut *mut c_void) -> Status,
 	/// buffer: IN
-	pub free_pool: unsafe extern "efiapi" fn(buffer: *const c_void) -> Status,
+	free_pool: unsafe extern "efiapi" fn(buffer: *const c_void) -> Status,
 	/// eventtype: IN, notifytpl: IN, notifyfunction: IN, notifycontext: IN, event: OUT
 	create_event: unsafe extern "efiapi" fn(
 		eventtype: u32,
@@ -246,6 +255,49 @@ impl BootServices {
 		unsafe { (self.restore_tpl)(oldtpl) }
 	}
 
+	/// Returns a tuple containing the memory map size and descriptor size respectively
+	fn memory_map_size(&self) -> (usize, usize) {
+		let (mut memory_map_size, mut descriptor_size) = (0, 0);
+		let result = unsafe { (self.get_memory_map)(&mut memory_map_size, ptr::null_mut(), ptr::null_mut(), &mut descriptor_size, ptr::null_mut()) };
+		if result == Status::SUCCESS {
+			panic!("Unexpected Success in allocating memory map");
+		}
+		(memory_map_size, descriptor_size)
+	}
+
+	pub fn get_memory_map(&self, extra_descriptors: usize) -> Result<MemoryMap<'static>, Status> {
+		let (mut memory_map_size, mut descriptor_size) = self.memory_map_size();
+		memory_map_size += extra_descriptors * descriptor_size;
+
+		let pool = self.allocate_pool(MemoryType::LOADER_DATA, memory_map_size)?;
+
+		let (mut map_key, mut descriptor_version) = (0, 0);
+		unsafe {
+			(self.get_memory_map)(
+				&mut memory_map_size,
+				pool.as_ptr() as *mut MemoryDescriptor,
+				&mut map_key,
+				&mut descriptor_size,
+				&mut descriptor_version,
+			)
+			.map(|| MemoryMap::new(pool, map_key, descriptor_size, descriptor_version))
+		}
+	}
+
+	pub fn allocate_pool(&self, pool_type: MemoryType, pool_size: usize) -> Result<Pool<'static>, Status> {
+		let mut ptr = ptr::null_mut();
+		unsafe {
+			(self.allocate_pool)(pool_type, pool_size, &mut ptr).map(|| {
+				let data = core::slice::from_raw_parts_mut(ptr as *mut u8, pool_size);
+				Pool::new(data)
+			})
+		}
+	}
+
+	pub fn free_pool(&self, pool: Pool) -> Result<(), Status> {
+		unsafe { (self.free_pool)(pool.as_ptr()) }.map(|| ())
+	}
+
 	pub fn wait_for_event(&self, events: &[Event]) -> Result<usize, Status> {
 		let mut index = 0;
 		// SAFETY:
@@ -261,16 +313,19 @@ impl BootServices {
 		// the Status returned by handleprotocol
 		unsafe { (self.handle_protocol)(handle, &T::GUID, &mut interface).map(|| &mut *(interface as *mut T)) }
 	}
+
 	// pub fn stall(&self, microseconds: usize) -> Result<(), Status> {
 	// 	// SAFETY:
 	// 	unsafe { (self.stall)(microseconds) }.into_result(())
 	// }
+
 	pub fn locate_protocol<T: Protocol>(&self, registration: *mut c_void) -> Result<&mut T, Status> {
 		let mut interface = core::ptr::null();
 		// SAFETY:
 		// todo
 		unsafe { (self.locate_protocol)(&T::GUID, registration, &mut interface).map(|| &mut *(interface as *mut T)) }
 	}
+
 	// pub fn open_protocol<T: Protocol>(&self, handle: &*mut (), agenthandle: *mut (), controllerhandle: *mut (), attributes: u32) -> Result<*mut ()<T>, Status> {
 	// 	let mut interface = core::ptr::null();
 	// 	// SAFETY:

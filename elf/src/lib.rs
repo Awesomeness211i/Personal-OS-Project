@@ -17,9 +17,7 @@ use crate::{
 		EI_NIDENT,
 		Elf32Header,
 		Elf64Header,
-		ElfHeader::{
-			self,
-		},
+		ElfHeader,
 		ExecutableType,
 		Identifier,
 		IdentifierVersion,
@@ -31,7 +29,7 @@ use crate::{
 	program_header::ProgramHeaderIterator,
 };
 
-pub mod elf;
+pub mod dynamic;
 pub mod elf_header;
 pub mod program_header;
 pub mod section_header;

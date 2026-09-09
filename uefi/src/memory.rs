@@ -1,4 +1,9 @@
-use core::fmt::Debug;
+use core::{
+	ffi::c_void,
+	fmt::Debug,
+	iter::Map,
+	slice,
+};
 
 use super::{
 	PhysicalAddress,
@@ -133,6 +138,98 @@ impl MemoryType {
 	}
 	pub const fn get(&self) -> u32 {
 		self.0
+	}
+}
+
+#[derive(Debug)]
+pub struct Pool<'a> {
+	data: &'a mut [u8],
+}
+
+impl<'a> Pool<'a> {
+	pub fn as_ptr(&self) -> *const c_void {
+		self.data.as_ptr() as *const _
+	}
+
+	pub fn as_mut_ptr(&mut self) -> *mut c_void {
+		self.data.as_mut_ptr() as *mut _
+	}
+
+	pub fn as_slice(&self) -> &[u8] {
+		self.data
+	}
+
+	pub fn as_mut_slice(&mut self) -> &mut [u8] {
+		self.data
+	}
+
+	pub fn len(&self) -> usize {
+		self.data.len()
+	}
+
+	pub fn deconstruct(self) -> &'a mut [u8] {
+		self.data
+	}
+
+	/// Shouldn't be used unless you have deconstructed a pool type into its internal buffer
+	pub unsafe fn new(data: &'a mut [u8]) -> Self {
+		Self { data }
+	}
+}
+
+#[derive(Debug)]
+pub struct MemoryMap<'a> {
+	data: Pool<'a>,
+	pub(crate) map_key: usize,
+	descriptor_size: usize,
+	descriptor_version: u32,
+}
+
+impl<'a> MemoryMap<'a> {
+	pub(crate) unsafe fn new(data: Pool<'a>, map_key: usize, descriptor_size: usize, descriptor_version: u32) -> Self {
+		if descriptor_version >= MemoryDescriptor::VERSION && descriptor_size >= size_of::<MemoryDescriptor>() {
+			Self {
+				data,
+				map_key,
+				descriptor_size,
+				descriptor_version,
+			}
+		} else {
+			panic!("Memory Descriptor Version or Size mismatch: version: {descriptor_version}, size: {descriptor_size}")
+		}
+	}
+
+	pub fn version(&self) -> u32 {
+		self.descriptor_version
+	}
+
+	/// Memory Map Pointer, Memory Map size, Map Key, Descriptor Size, Descriptor Version
+	pub fn deconstruct(mut self) -> (*mut c_void, usize, usize, usize, u32) {
+		(self.data.as_mut_ptr(), self.data.len(), self.map_key, self.descriptor_size, self.descriptor_version)
+	}
+}
+
+fn chunk_to_descriptor(c: &[u8]) -> &MemoryDescriptor {
+	unsafe { &*(c.as_ptr() as *const MemoryDescriptor) }
+}
+
+fn chunk_to_descriptor_mut(c: &mut [u8]) -> &mut MemoryDescriptor {
+	unsafe { &mut *(c.as_mut_ptr() as *mut MemoryDescriptor) }
+}
+
+impl<'a> IntoIterator for &'a MemoryMap<'_> {
+	type Item = &'a MemoryDescriptor;
+	type IntoIter = Map<slice::ChunksExact<'a, u8>, fn(&[u8]) -> &MemoryDescriptor>;
+	fn into_iter(self) -> Self::IntoIter {
+		self.data.as_slice().chunks_exact(self.descriptor_size).map(chunk_to_descriptor)
+	}
+}
+
+impl<'a> IntoIterator for &'a mut MemoryMap<'_> {
+	type Item = &'a mut MemoryDescriptor;
+	type IntoIter = Map<slice::ChunksExactMut<'a, u8>, fn(&mut [u8]) -> &mut MemoryDescriptor>;
+	fn into_iter(self) -> Self::IntoIter {
+		self.data.as_mut_slice().chunks_exact_mut(self.descriptor_size).map(chunk_to_descriptor_mut)
 	}
 }
 

@@ -70,7 +70,7 @@ impl<const SIZE: usize> IndexMut<usize> for Page<SIZE> {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct AddressSpace {
 	ptr: PhysicalAddress,
 	virtual_ptr: VirtualAddress,
