@@ -30,7 +30,7 @@ impl GraphicsPixelFormat {
 }
 
 #[repr(C)]
-pub struct GraphicsOutputProtocol {
+pub struct GraphicsOutputProtocol<'a> {
 	/// this: IN, modenumber: IN, sizeofinfo: OUT, info: OUT
 	pub query_mode: unsafe extern "efiapi" fn(this: *const Self, modenumber: u32, sizeofinfo: *mut usize, info: *mut *const GraphicsOutputModeInformation) -> Status,
 	pub set_mode: unsafe extern "efiapi" fn(*const Self, modenumber: u32) -> Status,
@@ -47,9 +47,9 @@ pub struct GraphicsOutputProtocol {
 		height: usize,
 		delta: Option<core::num::NonZeroUsize>,
 	) -> Status,
-	pub mode: *mut GraphicsOutputProtocolMode,
+	pub mode: &'a GraphicsOutputProtocolMode<'a>,
 }
-impl GraphicsOutputProtocol {
+impl GraphicsOutputProtocol<'_> {
 	pub const fn grapics_color(color: u32, mask: &PixelBitmask) -> GraphicsPixel {
 		GraphicsPixel {
 			blue: (color >> mask.blue_mask.trailing_zeros()) as u8,
@@ -59,18 +59,18 @@ impl GraphicsOutputProtocol {
 		}
 	}
 }
-unsafe impl Protocol for GraphicsOutputProtocol {}
-impl HasGUID for GraphicsOutputProtocol {
+unsafe impl Protocol for GraphicsOutputProtocol<'_> {}
+impl HasGUID for GraphicsOutputProtocol<'_> {
 	/// GUID: 9042A9DE-23DC-4A38-96FB-7ADED080516A
 	const GUID: GUID = GUID::new(0x9042A9DE, 0x23DC, 0x4A38, 0x96FB_7ADED080516A);
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct GraphicsOutputProtocolMode {
+pub struct GraphicsOutputProtocolMode<'a> {
 	pub max_mode: u32,
 	pub mode: u32,
-	pub info: *const GraphicsOutputModeInformation,
+	pub info: &'a GraphicsOutputModeInformation,
 	pub size_of_info: usize,
 	pub framebuffer_base: PhysicalAddress,
 	pub framebuffer_size: usize,
@@ -109,9 +109,9 @@ impl PixelBitmask {
 #[repr(C)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash)]
 pub struct GraphicsPixel {
-	pub blue: u8,
-	pub green: u8,
-	pub red: u8,
+	blue: u8,
+	green: u8,
+	red: u8,
 	reserved: u8,
 }
 

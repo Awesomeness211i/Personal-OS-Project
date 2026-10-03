@@ -6,8 +6,12 @@ use core::{
 	ops::{
 		BitAnd,
 		BitOr,
+		Index,
+		IndexMut,
 	},
 };
+
+use crate::x86_64::PAGE_SIZE;
 
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -70,7 +74,7 @@ impl BitOr for EntryFlags {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Entry(u64);
 
 impl Entry {
@@ -119,7 +123,58 @@ impl<const ENTRY_NUM: usize> Table<ENTRY_NUM> {
 		&self.entries
 	}
 
-	pub unsafe fn get_entries(&mut self) -> &mut [Entry] {
+	pub fn get_entries(&mut self) -> &mut [Entry] {
 		&mut self.entries
+	}
+}
+
+#[repr(C, align(4096))]
+#[derive(Debug)]
+pub struct Page<const SIZE: usize = PAGE_SIZE> {
+	data: [u8; SIZE],
+}
+
+impl<const SIZE: usize> Page<SIZE> {
+	pub const fn as_ref(&self) -> &[u8] {
+		&self.data
+	}
+	pub const fn as_mut(&mut self) -> &mut [u8] {
+		&mut self.data
+	}
+}
+
+pub struct PageIterator<'a, const SIZE: usize> {
+	page: &'a Page<SIZE>,
+	index: usize,
+}
+
+impl<'a, const SIZE: usize> From<&'a Page<SIZE>> for PageIterator<'a, SIZE> {
+	fn from(value: &'a Page<SIZE>) -> Self {
+		Self { page: value, index: 0 }
+	}
+}
+
+impl<'a, const SIZE: usize> Iterator for PageIterator<'a, SIZE> {
+	type Item = u8;
+	fn next(&mut self) -> Option<Self::Item> {
+		if let Some(result) = self.page.data.get(self.index) {
+			self.index += 1;
+			Some(*result)
+		} else {
+			None
+		}
+	}
+}
+
+impl<const SIZE: usize> Index<usize> for Page<SIZE> {
+	type Output = u8;
+	fn index(&self, index: usize) -> &Self::Output {
+		&self.data[index]
+	}
+}
+
+impl<const SIZE: usize> IndexMut<usize> for Page<SIZE> {
+	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+		&mut self.data[index]
 	}
 }

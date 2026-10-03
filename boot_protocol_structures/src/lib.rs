@@ -1,3 +1,4 @@
+// #![feature(ptr_metadata)]
 #![no_std]
 #![deny(clippy::undocumented_unsafe_blocks)]
 // #![warn(missing_docs)]
@@ -11,6 +12,10 @@ use acpi::{
 	RootSystemDescriptionPointer,
 	RootSystemDescriptionPointerEx,
 };
+use uefi::protocols::graphics::{
+	GraphicsPixel,
+	GraphicsPixelFormat,
+};
 
 use crate::address_space::AddressSpace;
 
@@ -20,17 +25,21 @@ pub struct KernelData {
 	pub version_tag: usize,
 	/// Size of this structure in bytes
 	pub size: usize,
+	pub root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
+	pub root_system_description_pointer: RootSystemDescriptionPointer,
+	pub system_table: uefi::SystemTablePointer<uefi::RuntimeServices>,
+	pub address_space: AddressSpace,
 	pub memory_map: *mut c_void,
+	pub descriptor_version: u32,
 	pub descriptor_size: usize,
 	pub memory_map_size: usize,
 	pub map_key: usize,
-	pub descriptor_version: u32,
 	pub stack_page_count: usize,
-	pub trampoline_page: uefi::PhysicalAddress,
-	pub address_space: AddressSpace,
-	pub system_table: uefi::SystemTablePointer<uefi::RuntimeServices>,
-	pub root_system_description_pointer: RootSystemDescriptionPointer,
-	pub root_system_description_pointer_ex: RootSystemDescriptionPointerEx,
+	pub graphics_ptr: *mut GraphicsPixel,
+	pub pixel_format: GraphicsPixelFormat,
+	pub pixels_per_scanline: u32,
+	pub graphics_len: usize,
+	pub base_address: u64,
 }
 
 impl KernelData {

@@ -121,6 +121,7 @@ impl Status {
 	pub const IP_ADDRESS_CONFLICT: Status = Status(Error::IPAddressConflict as usize);
 	pub const ERROR_HTTP: Status = Status(Error::Http as usize);
 }
+
 #[repr(C)]
 enum Warn {
 	UnknownGlyph = 0x1,
@@ -131,6 +132,7 @@ enum Warn {
 	FileSystem = 0x6,
 	ResetRequired = 0x7,
 }
+
 #[repr(usize)]
 #[allow(clippy::enum_clike_unportable_variant)]
 enum Error {

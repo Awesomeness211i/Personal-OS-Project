@@ -102,7 +102,7 @@ pub struct BootServices {
 	/// memory: IN, pages: IN
 	pub free_pages: unsafe extern "efiapi" fn(memory: PhysicalAddress, pages: usize) -> Status,
 	/// memorymapsize: IN OUT, memorymap: OUT, mapkey: OUT, descriptorsize: OUT, descriptorversion: OUT
-	pub get_memory_map: unsafe extern "efiapi" fn(memorymapsize: *mut usize, memorymap: *mut MemoryDescriptor, mapkey: *mut usize, descriptorsize: *mut usize, descriptorversion: *mut u32) -> Status,
+	get_memory_map: unsafe extern "efiapi" fn(memorymapsize: *mut usize, memorymap: *mut MemoryDescriptor, mapkey: *mut usize, descriptorsize: *mut usize, descriptorversion: *mut u32) -> Status,
 	/// pooltype: IN, size: IN, buffer: OUT
 	/// size in bytes
 	allocate_pool: unsafe extern "efiapi" fn(pooltype: MemoryType, size: usize, buffer: *mut *mut c_void) -> Status,
@@ -265,7 +265,7 @@ impl BootServices {
 		(memory_map_size, descriptor_size)
 	}
 
-	pub fn get_memory_map(&self, extra_descriptors: usize) -> Result<MemoryMap<'static>, Status> {
+	pub fn get_memory_map<'a>(&self, extra_descriptors: usize) -> Result<MemoryMap<'a>, Status> {
 		let (mut memory_map_size, mut descriptor_size) = self.memory_map_size();
 		memory_map_size += extra_descriptors * descriptor_size;
 
@@ -280,11 +280,25 @@ impl BootServices {
 				&mut descriptor_size,
 				&mut descriptor_version,
 			)
-			.map(|| MemoryMap::new(pool, map_key, descriptor_size, descriptor_version))
+			.map(|| MemoryMap::new(pool, memory_map_size, map_key, descriptor_size, descriptor_version))
 		}
 	}
 
-	pub fn allocate_pool(&self, pool_type: MemoryType, pool_size: usize) -> Result<Pool<'static>, Status> {
+	// pub fn allocate_pages<'a>(&self, pool_type: MemoryType, pool_size: usize) -> Result<, Status> {
+	// 	let mut ptr = ptr::null_mut();
+	// 	unsafe {
+	// 		(self.allocate_pages)(pool_type, pool_size, &mut ptr).map(|| {
+	// 			let data = core::slice::from_raw_parts_mut(ptr as *mut u8, pool_size);
+	// 			Pool::new(data)
+	// 		})
+	// 	}
+	// }
+
+	// pub fn free_pages(&self, pool: Pool) -> Result<(), Status> {
+	// 	unsafe { (self.free_pages)(pool.as_ptr()) }.map(|| ())
+	// }
+
+	pub fn allocate_pool<'a>(&self, pool_type: MemoryType, pool_size: usize) -> Result<Pool<'a>, Status> {
 		let mut ptr = ptr::null_mut();
 		unsafe {
 			(self.allocate_pool)(pool_type, pool_size, &mut ptr).map(|| {
@@ -305,7 +319,7 @@ impl BootServices {
 		unsafe { (self.wait_for_event)(events.len(), events.as_ptr(), &mut index) }.into_result(index)
 	}
 
-	pub fn handle_protocol<T: Protocol>(&self, handle: *mut c_void) -> Result<&mut T, Status> {
+	pub fn handle_protocol<'a, T: Protocol>(&self, handle: *mut c_void) -> Result<&'a mut T, Status> {
 		let mut interface = core::ptr::null();
 		// SAFETY:
 		// Should be safe because to call this we need a valid implementation of Protocol and even
@@ -319,7 +333,7 @@ impl BootServices {
 	// 	unsafe { (self.stall)(microseconds) }.into_result(())
 	// }
 
-	pub fn locate_protocol<T: Protocol>(&self, registration: *mut c_void) -> Result<&mut T, Status> {
+	pub fn locate_protocol<'a, T: Protocol>(&self, registration: *mut c_void) -> Result<&'a mut T, Status> {
 		let mut interface = core::ptr::null();
 		// SAFETY:
 		// todo

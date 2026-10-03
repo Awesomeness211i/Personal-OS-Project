@@ -1,13 +1,10 @@
-use core::ops::{
-	Index,
-	IndexMut,
-};
-
 use arch::x86_64::{
-	PAGE_SIZE,
+	LOW_HALF,
+	LogicalAddress,
 	paging::{
 		Entry,
 		EntryFlags,
+		Page,
 		Table,
 	},
 };
@@ -18,93 +15,42 @@ use uefi::{
 
 use crate::debug_print::println;
 
-#[repr(C, align(4096))]
-#[derive(Debug)]
-pub struct Page<const SIZE: usize = PAGE_SIZE> {
-	data: [u8; SIZE],
-}
-
-impl<const SIZE: usize> Page<SIZE> {
-	pub const fn as_ref(&self) -> &[u8] {
-		&self.data
-	}
-	pub const fn as_mut(&mut self) -> &mut [u8] {
-		&mut self.data
-	}
-}
-
-pub struct PageIterator<'a, const SIZE: usize> {
-	page: &'a Page<SIZE>,
-	index: usize,
-}
-
-impl<'a, const SIZE: usize> From<&'a Page<SIZE>> for PageIterator<'a, SIZE> {
-	fn from(value: &'a Page<SIZE>) -> Self {
-		Self { page: value, index: 0 }
-	}
-}
-
-impl<'a, const SIZE: usize> Iterator for PageIterator<'a, SIZE> {
-	type Item = u8;
-	fn next(&mut self) -> Option<Self::Item> {
-		if let Some(result) = self.page.data.get(self.index) {
-			self.index += 1;
-			Some(*result)
-		} else {
-			None
-		}
-	}
-}
-
-impl<const SIZE: usize> Index<usize> for Page<SIZE> {
-	type Output = u8;
-	fn index(&self, index: usize) -> &Self::Output {
-		&self.data[index]
-	}
-}
-
-impl<const SIZE: usize> IndexMut<usize> for Page<SIZE> {
-	fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-		&mut self.data[index]
-	}
-}
-
 #[repr(C)]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct AddressSpace {
-	ptr: PhysicalAddress,
-	virtual_ptr: VirtualAddress,
+	ptr: LogicalAddress,
 	next_allocation_index: usize,
 	page_count: usize,
-	// TODO: Actually use this field to map things properly
 	levels: u8,
-	is_virtual: bool,
 }
 
 impl AddressSpace {
-	pub fn create(paddr: PhysicalAddress, vaddr: VirtualAddress, page_count: usize, levels: u8) -> Self {
+	pub fn create(mut laddr: LogicalAddress, page_count: usize, levels: u8) -> Self {
 		assert!(page_count > 0);
+		assert!(size_of::<Page>() == size_of::<Table>());
 		// # Safety:
 		// todo
 		unsafe {
-			paddr.to_ptr::<Page>().write_bytes(0, page_count);
+			laddr.as_mut_ptr::<Table>().write_bytes(0, page_count);
 		}
 		Self {
-			ptr: paddr,
-			virtual_ptr: vaddr,
+			ptr: laddr,
 			next_allocation_index: 1,
 			page_count,
 			levels,
-			is_virtual: false,
 		}
 	}
 
-	pub fn switch_to_virtual(&mut self) {
-		self.is_virtual = true;
+	pub fn switch_to_virtual(&mut self, vaddr: VirtualAddress) {
+		self.ptr = LogicalAddress::new(vaddr.get() + (self.ptr.get() & LOW_HALF));
 	}
 
-	pub fn get_ptr<T>(&self) -> *mut T {
-		if self.is_virtual { self.virtual_ptr.to_ptr::<T>() } else { self.ptr.to_ptr::<T>() }
+	pub fn as_ptr<T>(&mut self) -> *const T {
+		self.ptr.as_ptr::<T>()
+	}
+
+	pub fn as_mut_ptr<T>(&mut self) -> *mut T {
+		self.ptr.as_mut_ptr::<T>()
 	}
 
 	pub fn get_page_count(&self) -> usize {
@@ -131,17 +77,18 @@ impl AddressSpace {
 			Ok(entry) => entry,
 			Err(_) => {
 				if self.next_allocation_index < self.page_count {
-					let page_table_allocation = unsafe { self.get_ptr::<Page>().add(self.next_allocation_index) };
+					// # Safety:
+					// Should be safe because of the check on page count
+					let page_table_allocation = unsafe { self.as_mut_ptr::<Table>().add(self.next_allocation_index) };
 					println(format_args!("Page Table Allocation Address: {page_table_allocation:#X?}"));
 
 					self.next_allocation_index += 1;
 					let entry = Entry::new((page_table_allocation as u64) | flags.get());
+
 					// # Safety:
-					// todo
-					unsafe {
-						(&mut *ptr).get_entries()[table_index] = entry.clone();
-						entry
-					}
+					// Should be safe because of the check on page count
+					unsafe { &mut *ptr }.get_entries()[table_index] = entry.clone();
+					entry
 				} else {
 					panic!("Failed to allocate page table")
 				}
@@ -150,33 +97,26 @@ impl AddressSpace {
 	}
 
 	pub fn mmap(&mut self, vaddr: VirtualAddress, paddr: PhysicalAddress, parent_flags: EntryFlags, flags: EntryFlags) {
-		// TODO: Figure out how I would do stuff with more than just PML4 4KiB pages
-		assert!(self.levels == 4);
 		let index_mask = 0x1FF;
-
 		let vaddr_no_offset = vaddr.get() as usize >> 12;
-		let page_table_index = (vaddr_no_offset >> (9 * 0)) & index_mask;
-		let page_middle_directory_index = (vaddr_no_offset >> (9 * 1)) & index_mask;
-		let page_upper_directory_index = (vaddr_no_offset >> (9 * 2)) & index_mask;
-		let page_global_directory_index = (vaddr_no_offset >> (9 * 3)) & index_mask;
 
-		// for i in 0..self.levels {}
-		let mut page_global_directory_entry = self.get_or_create_entry(self.get_ptr::<Table>(), page_global_directory_index, parent_flags);
-		let mut page_upper_directory_entry = self.get_or_create_entry(page_global_directory_entry.to_mut_addr(), page_upper_directory_index, parent_flags);
-		let mut page_middle_directory_entry = self.get_or_create_entry(page_upper_directory_entry.to_mut_addr(), page_middle_directory_index, parent_flags);
-
-		let page_table = page_middle_directory_entry.to_mut_addr();
-
-		if page_table.entries()[page_table_index].exists() {
-			panic!("Trying to map a page twice to the same entry seems problematic")
-		} else {
-			// println(format_args!(
-			// 	"{paddr:#X} -> {:#X}: {page_global_directory_index} {page_upper_directory_index} {page_middle_directory_index} {page_table_index} {flags:X?}",
-			// 	vaddr.get() & !0xFFF
-			// ));
-			// # Safety:
-			// todo
-			unsafe { page_table.get_entries()[page_table_index] = Entry::new(paddr.get() | flags.get()) }
+		let mut entry = Entry::new(0);
+		for i in (0..self.levels).rev() {
+			let index = (vaddr_no_offset >> (9 * i)) & index_mask;
+			entry = if i == self.levels - 1 {
+				let table = self.as_mut_ptr();
+				self.get_or_create_entry(table, index, parent_flags)
+			} else if i > 0 {
+				self.get_or_create_entry(entry.to_mut_addr(), index, parent_flags)
+			} else {
+				let page_table = entry.to_mut_addr();
+				if page_table.entries()[index].exists() {
+					panic!("Trying to map a page twice to the same entry seems problematic, physical address: {paddr:#X}, virtual address: {vaddr:#X?}")
+				} else {
+					page_table.get_entries()[index] = Entry::new(paddr.get() | flags.get())
+				}
+				break;
+			};
 		}
 	}
 }

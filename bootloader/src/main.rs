@@ -18,15 +18,19 @@ use acpi::{
 	RootSystemDescriptionPointerEx,
 };
 use arch::x86_64::{
+	HIGH_HALF,
+	LOW_HALF,
+	LogicalAddress,
 	PAGE_SIZE,
-	paging::EntryFlags,
+	paging::{
+		EntryFlags,
+		Page,
+		Table,
+	},
 };
 use boot_protocol_structures::{
 	KernelData,
-	address_space::{
-		AddressSpace,
-		Page,
-	},
+	address_space::AddressSpace,
 	debug_print::{
 		Port,
 		println,
@@ -280,7 +284,6 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 
 					let zero_fill_count = program_header_mem_size - program_header_file_size;
 					if zero_fill_count > 0 {
-						println(format_args!("Filling zeros: {zero_fill_count}"));
 						unsafe { address.to_ptr::<u8>().add((page_iter << 12) + page_offset + program_header_file_size).write_bytes(0, zero_fill_count) };
 					}
 					page_iter += segment_pages;
@@ -288,8 +291,7 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 				_ => continue,
 			}
 		}
-		kernel_pages_needed
-	};
+	}
 
 	// Allocate kernel argument pages
 	let kernel_arguments_physical = {
@@ -322,16 +324,17 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 		.unwrap_or_else(|e| panic!("Failed to find GraphicsOutputProtocol: {e}"));
 
 	let graphics_mode = graphics.mode;
-	let graphics_max_mode = unsafe { (*graphics_mode).max_mode };
+	let graphics_max_mode = graphics_mode.max_mode;
+
 	let mut query_mode = 0;
-	let (mut mode, mut w, mut h, mut pix_per_scan, mut format) = (0, 0, 0, 0, GraphicsPixelFormat::RED_GREEN_BLUE_RESERVED_8BIT_PER_COLOR);
+	let (mut mode, mut w, mut h, mut pixels_per_scanline, mut pixel_format) = (0, 0, 0, 0, GraphicsPixelFormat::RED_GREEN_BLUE_RESERVED_8BIT_PER_COLOR);
 
 	while query_mode < graphics_max_mode {
 		let mut size = 0;
 		let mut ptr = ptr::null();
 		let status = unsafe { ((*graphics).query_mode)(graphics, query_mode, &mut size, &mut ptr) };
 		match status {
-			Status::SUCCESS => println(format_args!("Successfully queried mode {mode}")),
+			Status::SUCCESS => println(format_args!("Successfully queried mode {query_mode}")),
 			e => {
 				println(format_args!("Expected Success but got {e} instead"));
 				continue;
@@ -341,11 +344,10 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 		if (w <= info.horizontal_resolution && h <= info.vertical_resolution) && (info.horizontal_resolution <= 1920 && info.vertical_resolution <= 1080) {
 			w = info.horizontal_resolution;
 			h = info.vertical_resolution;
-			format = info.pixel_format;
-			pix_per_scan = info.pixels_per_scanline;
+			pixels_per_scanline = info.pixels_per_scanline;
+			pixel_format = info.pixel_format;
 			mode = query_mode;
 		}
-		println(format_args!("{info:?}"));
 		query_mode += 1;
 	}
 
@@ -354,20 +356,18 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 		panic!("Couldn't Set Mode {mode}");
 	}
 
-	let graphics_ptr = unsafe { (*graphics_mode).framebuffer_base }.to_ptr::<GraphicsPixel>();
-	let graphics_len = w as usize * h as usize * size_of::<GraphicsPixel>();
+	let graphics_ptr = graphics_mode.framebuffer_base.to_ptr::<GraphicsPixel>();
+	let graphics_len = h as usize * pixels_per_scanline as usize * size_of::<GraphicsPixel>();
 
 	let mut memory_map = system_table.boot_services().get_memory_map(1).unwrap_or_else(|e| panic!("Failed to get memory map: {e}"));
-	println(format_args!("{memory_map:X?}"));
 
 	let system_table = system_table
 		.exit_boot_services(image_handle, &memory_map)
 		.unwrap_or_else(|_system_table| panic!("Exit Boot Services Failed!: Memory Map Pointer: {memory_map:#X?}"));
 
-	let low_half = 0x0000_7FFF_FFFF_F000;
 	let base_address = if kernel_elf_header.executable_type() == ExecutableType::DYNAMIC {
 		// TODO: Actually figure out what base address I want or even potentially do randomization?
-		0xFFFF_8000_0000_0000
+		HIGH_HALF
 	} else {
 		0x0
 	};
@@ -378,7 +378,6 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 	let mut root_system_description_pointer = RootSystemDescriptionPointer::default();
 	let mut root_system_description_pointer_ex = RootSystemDescriptionPointerEx::default();
 	for table in config_tables {
-		println(format_args!("{table:?}"));
 		match table.vendor_guid {
 			ConfigurationTable::EFI_ACPI_20_TABLE => {
 				let acpi_table = table.vendor_table as *const acpi::RootSystemDescriptionPointerEx;
@@ -408,62 +407,37 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 
 	let mut min_page_map_num = 0;
 	for descriptor in &mut memory_map {
-		let offset = descriptor.physical_start.get() & low_half;
+		let offset = descriptor.physical_start.get() & LOW_HALF;
 		match descriptor.region_type {
-			MemoryType::BOOT_SERVICES_CODE | MemoryType::BOOT_SERVICES_DATA => {
+			MemoryType::RESERVED | MemoryType::UNUSABLE_MEMORY => continue,
+			MemoryType::BOOT_SERVICES_CODE
+			| MemoryType::RUNTIME_SERVICES_CODE
+			| MemoryType::LOADER_CODE
+			| MemoryType::BOOT_SERVICES_DATA
+			| MemoryType::RUNTIME_SERVICES_DATA
+			| MemoryType::LOADER_DATA
+			| MemoryType::PERSISTENT_MEMORY
+			| TRAMPOLINE_PAGE => {
 				descriptor.virtual_start = VirtualAddress::new(descriptor.physical_start.get());
-				min_page_map_num += descriptor.num_pages;
 			},
-			MemoryType::ACPI_MEMORY_NVS | MemoryType::PERSISTENT_MEMORY | MemoryType::CONVENTIONAL_MEMORY | MemoryType::LOADER_DATA | MemoryType::LOADER_CODE | MemoryType::PAL_CODE => {
-				descriptor.virtual_start = VirtualAddress::new(descriptor.physical_start.get());
-				min_page_map_num += descriptor.num_pages;
-			},
-			MemoryType::RUNTIME_SERVICES_CODE | MemoryType::RUNTIME_SERVICES_DATA => {
-				descriptor.virtual_start = VirtualAddress::new(descriptor.physical_start.get());
-				min_page_map_num += descriptor.num_pages;
-			},
-			KERNEL_PAGE => {
+			_ => {
 				descriptor.virtual_start = VirtualAddress::new(base_address + offset);
-				min_page_map_num += descriptor.num_pages;
 			},
-			ARGUMENTS => {
-				// descriptor.virtual_start = VirtualAddress::new(base_address + (kernel_page_count << 12) as u64);
-				descriptor.virtual_start = VirtualAddress::new(base_address + offset);
-				min_page_map_num += descriptor.num_pages;
-			},
-			STACK_PAGE => {
-				// descriptor.virtual_start = VirtualAddress::new(base_address + ((1 + kernel_page_count + kernel_arguments_page_count) << 12) as u64);
-				descriptor.virtual_start = VirtualAddress::new(base_address + offset);
-				min_page_map_num += descriptor.num_pages;
-			},
-			TRAMPOLINE_PAGE => {
-				descriptor.virtual_start = VirtualAddress::new(descriptor.physical_start.get());
-				min_page_map_num += descriptor.num_pages;
-			},
-			ELF_FILE => {
-				descriptor.region_type = MemoryType::CONVENTIONAL_MEMORY;
-				descriptor.virtual_start = VirtualAddress::new(descriptor.physical_start.get());
-				min_page_map_num += descriptor.num_pages;
-			},
-			_ => continue,
 		}
+		println(format_args!("{descriptor:#X?}"));
+		min_page_map_num += descriptor.num_pages;
 	}
 
 	let mut address_space_physical = PhysicalAddress::new(0);
 	let mut address_space_virtual = VirtualAddress::new(0);
 	let mut address_space_page_num = 0;
 	for descriptor in &mut memory_map {
-		let offset = descriptor.physical_start.get() & low_half;
 		match descriptor.region_type {
 			MemoryType::CONVENTIONAL_MEMORY => {
 				if descriptor.num_pages >= min_page_map_num.div_ceil(512) {
-					// let count = kernel_page_count + kernel_arguments_page_count + stack_page_count + 1;
-					// let virtual_ptr = VirtualAddress::new(base_address + (count << 12) as u64);
-					let virtual_ptr = VirtualAddress::new(base_address + offset);
 					descriptor.region_type = ADDRESS_SPACE;
-					descriptor.virtual_start = virtual_ptr;
 					address_space_physical = descriptor.physical_start;
-					address_space_virtual = virtual_ptr;
+					address_space_virtual = descriptor.virtual_start;
 					address_space_page_num = descriptor.num_pages;
 					break;
 				}
@@ -476,30 +450,64 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 		panic!("Not enough space for page tables?!");
 	}
 
-	let mut kernel_address_space = AddressSpace::create(address_space_physical, address_space_virtual, address_space_page_num as usize, 4);
+	println(format_args!(
+		"ADDRESS SPACE: physical: {address_space_physical:#X?}, virtual: {address_space_virtual:#X?}, page number: {address_space_page_num}"
+	));
+
+	let mut kernel_address_space = AddressSpace::create(LogicalAddress::new(address_space_physical.get()), address_space_page_num as usize, 4);
+
+	let virtual_graphics_ptr = VirtualAddress::new(base_address + ((graphics_ptr as u64) & (LOW_HALF)));
+	for i in 0..graphics_len.div_ceil(PAGE_SIZE) {
+		kernel_address_space.mmap(
+			VirtualAddress::new(virtual_graphics_ptr.get() + (i << 12) as u64),
+			PhysicalAddress::new(graphics_ptr as u64 + (i << 12) as u64),
+			EntryFlags::PRESENT | EntryFlags::READ_WRITE,
+			EntryFlags::PRESENT | EntryFlags::READ_WRITE | EntryFlags::WRITE_THROUGH | EntryFlags::PAGE_CACHE_DISABLE,
+		);
+	}
 
 	let mut stack = None;
 	let mut kernel_pages = None;
 	let mut kernel_arguments = None;
 	for descriptor in &memory_map {
 		match descriptor.region_type {
-			MemoryType::CONVENTIONAL_MEMORY | MemoryType::ACPI_MEMORY_NVS | MemoryType::PERSISTENT_MEMORY => {
+			TRAMPOLINE_PAGE => {
 				for i in 0..descriptor.num_pages {
 					kernel_address_space.mmap(
 						VirtualAddress::new(descriptor.virtual_start.get() + (i << 12)),
 						PhysicalAddress::new(descriptor.physical_start.get() + (i << 12)),
-						EntryFlags::PRESENT,
-						EntryFlags::NONE,
+						EntryFlags::PRESENT | EntryFlags::READ_WRITE,
+						EntryFlags::PRESENT | EntryFlags::READ_WRITE | EntryFlags::WRITE_THROUGH | EntryFlags::PAGE_CACHE_DISABLE,
 					);
 				}
 			},
-			MemoryType::RUNTIME_SERVICES_CODE | MemoryType::RUNTIME_SERVICES_DATA | TRAMPOLINE_PAGE => {
+			MemoryType::ACPI_MEMORY_NVS | MemoryType::ACPI_RECLAIM_MEMORY => {
 				for i in 0..descriptor.num_pages {
 					kernel_address_space.mmap(
 						VirtualAddress::new(descriptor.virtual_start.get() + (i << 12)),
 						PhysicalAddress::new(descriptor.physical_start.get() + (i << 12)),
-						EntryFlags::PRESENT,
-						EntryFlags::PRESENT,
+						EntryFlags::PRESENT | EntryFlags::READ_WRITE,
+						EntryFlags::NOT_EXECUTABLE | EntryFlags::PRESENT | EntryFlags::READ_WRITE,
+					);
+				}
+			},
+			MemoryType::BOOT_SERVICES_CODE | MemoryType::RUNTIME_SERVICES_CODE => {
+				for i in 0..descriptor.num_pages {
+					kernel_address_space.mmap(
+						VirtualAddress::new(descriptor.virtual_start.get() + (i << 12)),
+						PhysicalAddress::new(descriptor.physical_start.get() + (i << 12)),
+						EntryFlags::PRESENT | EntryFlags::READ_WRITE,
+						EntryFlags::PRESENT | EntryFlags::WRITE_THROUGH | EntryFlags::PAGE_CACHE_DISABLE,
+					);
+				}
+			},
+			MemoryType::BOOT_SERVICES_DATA | MemoryType::RUNTIME_SERVICES_DATA => {
+				for i in 0..descriptor.num_pages {
+					kernel_address_space.mmap(
+						VirtualAddress::new(descriptor.virtual_start.get() + (i << 12)),
+						PhysicalAddress::new(descriptor.physical_start.get() + (i << 12)),
+						EntryFlags::PRESENT | EntryFlags::READ_WRITE,
+						EntryFlags::NOT_EXECUTABLE | EntryFlags::PRESENT | EntryFlags::READ_WRITE | EntryFlags::WRITE_THROUGH | EntryFlags::PAGE_CACHE_DISABLE,
 					);
 				}
 			},
@@ -529,6 +537,10 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 							};
 
 							for i in 0..segment_pages {
+								println(format_args!(
+									"kernel virtual addresses: {:#X?}",
+									descriptor.virtual_start.get() + ((used_kernel_pages + i) << 12) as u64
+								));
 								kernel_address_space.mmap(
 									VirtualAddress::new(descriptor.virtual_start.get() + ((used_kernel_pages + i) << 12) as u64),
 									PhysicalAddress::new(descriptor.physical_start.get() + ((used_kernel_pages + i) << 12) as u64),
@@ -574,28 +586,6 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 									other => println(format_args!("{other:X?}")),
 								}
 							}
-							// let mut i = 0;
-							// loop {
-							// 	let dynamic_entry = unsafe { kernel.offset(program_header.offset() + i * size_of::<Elf64Dynamic>()) };
-							// 	match *dynamic_entry {
-							// 		Elf64Dynamic::HASH { ptr: _ } => {},
-							// 		Elf64Dynamic::STRTAB { ptr: _ } => {},
-							// 		Elf64Dynamic::SYMTAB { ptr: _ } => {},
-							// 		Elf64Dynamic::RELA { ptr } => rela = ptr,
-							// 		Elf64Dynamic::RELASZ { val } => rela_size = val,
-							// 		Elf64Dynamic::RELAENT { val } => rela_entry_size = val,
-							// 		// Elf64Dynamic::GnuRelaCount { val } => rela_count = val,
-							// 		Elf64Dynamic::REL { ptr } => rel = ptr,
-							// 		Elf64Dynamic::RELSZ { val } => rel_size = val,
-							// 		Elf64Dynamic::RELENT { val } => rel_entry_size = val,
-							// 		// Elf64Dynamic::GnuRelCount { val } => rel_count = val,
-							// 		Elf64Dynamic::STRSZ { val: _ } => {},
-							// 		Elf64Dynamic::SYMENT { val: _ } => {},
-							// 		Elf64Dynamic::Null => break,
-							// 		_ => {},
-							// 	}
-							// 	i += 1;
-							// }
 
 							if rela_entry_size > 0 {
 								println(format_args!("actual: {rela_entry_size}, expected: {}", size_of::<Elf64Rela>()));
@@ -610,9 +600,6 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 										// Base address + addend
 										Elf64RTypeX86_64::R_AMD64_RELATIVE => {
 											let relative = descriptor.virtual_start.get() + addend as u64;
-											// let off = descriptor.physical_start.get() + offset;
-											// println(format_args!("writing: {relative:X} to: {off:X}"));
-
 											// TODO: Check that this is correct
 											unsafe {
 												(descriptor.physical_start.to_ptr::<u8>().add(offset as usize) as *mut u64).write(relative);
@@ -638,12 +625,12 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 			},
 			STACK_PAGE => {
 				stack = Some(VirtualAddress::new(descriptor.virtual_start.get() + ((stack_page_count) << 12) as u64));
-				for i in 0..descriptor.num_pages {
+				for i in 1..descriptor.num_pages {
 					kernel_address_space.mmap(
 						VirtualAddress::new(descriptor.virtual_start.get() + (i << 12)),
 						PhysicalAddress::new(descriptor.physical_start.get() + (i << 12)),
 						EntryFlags::PRESENT | EntryFlags::READ_WRITE,
-						EntryFlags::PRESENT | EntryFlags::READ_WRITE,
+						EntryFlags::NOT_EXECUTABLE | EntryFlags::PRESENT | EntryFlags::READ_WRITE,
 					);
 				}
 			},
@@ -653,8 +640,8 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 					kernel_address_space.mmap(
 						VirtualAddress::new(descriptor.virtual_start.get() + (i << 12)),
 						PhysicalAddress::new(descriptor.physical_start.get() + (i << 12)),
-						EntryFlags::PRESENT | EntryFlags::READ_WRITE,
 						EntryFlags::PRESENT,
+						EntryFlags::NOT_EXECUTABLE | EntryFlags::PRESENT,
 					);
 				}
 			},
@@ -664,11 +651,21 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 						VirtualAddress::new(descriptor.virtual_start.get() + (i << 12)),
 						PhysicalAddress::new(descriptor.physical_start.get() + (i << 12)),
 						EntryFlags::PRESENT | EntryFlags::READ_WRITE,
-						EntryFlags::PRESENT | EntryFlags::READ_WRITE | EntryFlags::WRITE_THROUGH | EntryFlags::PAGE_CACHE_DISABLE,
+						EntryFlags::NOT_EXECUTABLE | EntryFlags::PRESENT | EntryFlags::READ_WRITE | EntryFlags::PAGE_CACHE_DISABLE,
 					);
 				}
 			},
-			_ => continue,
+			MemoryType::RESERVED | MemoryType::UNUSABLE_MEMORY => continue,
+			_ => {
+				for i in 0..descriptor.num_pages {
+					kernel_address_space.mmap(
+						VirtualAddress::new(descriptor.virtual_start.get() + (i << 12)),
+						PhysicalAddress::new(descriptor.physical_start.get() + (i << 12)),
+						EntryFlags::PRESENT | EntryFlags::READ_WRITE,
+						EntryFlags::NOT_EXECUTABLE,
+					);
+				}
+			},
 		}
 	}
 
@@ -684,32 +681,17 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 		panic!("No Stack?");
 	};
 
+	let address_space_ptr = kernel_address_space.as_ptr();
 	let (memory_map, memory_map_size, map_key, descriptor_size, descriptor_version) = memory_map.deconstruct();
-	let data = KernelData {
-		version_tag: KernelData::CURRENT_VERSION,
-		size: size_of::<KernelData>(),
-		memory_map,
-		descriptor_size,
-		memory_map_size,
-		map_key,
-		descriptor_version,
-		stack_page_count,
-		trampoline_page: trampoline,
-		address_space: kernel_address_space.clone(),
-		system_table,
-		root_system_description_pointer,
-		root_system_description_pointer_ex,
-	};
-	unsafe { kernel_arguments_physical.to_ptr::<KernelData>().write(data) };
-
 	let mut start: *mut u8;
 	let mut end: *mut u8;
-	unsafe {
+	let tramp = unsafe {
 		core::arch::asm!(
 			"lea {start}, [2f]",
 			"lea {end}, [3f]",
 			"jmp 3f",
 			"2:",
+			"mov rsp, rcx",
 			"mov cr3, rdx",
 			"xor rbx, rbx",
 			"xor rcx, rcx",
@@ -735,28 +717,33 @@ pub unsafe extern "efiapi" fn main(image_handle: *mut c_void, system_table: Syst
 		let size = end as usize - start as usize;
 		start.copy_to(trampoline.to_ptr(), size);
 
-		// should have arguments rdi, rsi, rdx, rcx, r8
-		// let tramp: extern "C" fn(kernel_args: *const u8, kernel_entry: *const u8, kernel_address_space: *const u8, stack: *const u8) -> ! = core::mem::transmute(trampoline);
-		// tramp(
-		// 	kernel_arguments.to_ptr(),
-		// 	kernel_entry.as_ptr().add(base_address as usize),
-		// 	kernel_address_space.get_ptr() as *const u8,
-		// 	stack.to_ptr(),
-		// );
+		let data = KernelData {
+			version_tag: KernelData::CURRENT_VERSION,
+			size: size_of::<KernelData>(),
+			root_system_description_pointer_ex,
+			root_system_description_pointer,
+			system_table,
+			address_space: kernel_address_space,
+			memory_map,
+			descriptor_size,
+			memory_map_size,
+			map_key,
+			descriptor_version,
+			stack_page_count,
+			graphics_ptr: virtual_graphics_ptr.to_ptr(),
+			pixel_format,
+			pixels_per_scanline,
+			graphics_len,
+			base_address,
+		};
+		kernel_arguments_physical.to_ptr::<KernelData>().write(data);
+		core::mem::transmute::<_, extern "sysv64" fn(kernel_args: *const u8, kernel_entry: usize, kernel_address_space: *const Table, stack: *const u8) -> !>(trampoline)
+	};
 
-		core::arch::asm!(
-			// creating my own calling convention for my trampoline page
-			// specifically using the usual conventions of C in a specific way
-			"mov rsp, rcx",
-			"jmp r8",
-			in("rdi") kernel_arguments.to_ptr::<u8>(),
-			in("rsi") kernel_entry + kernel_pages.get() as usize,
-			in("rdx") kernel_address_space.get_ptr::<u8>(),
-			in("rcx") stack.to_ptr::<u8>(),
-			in("r8") trampoline.to_ptr::<u8>(),
-			options(noreturn, nostack),
-		);
-	}
+	println(format_args!("About to jump to trampoline! {kernel_entry:#X?} {kernel_pages:#X?}"));
+
+	// should have arguments rdi, rsi, rdx, rcx, r8, etc in that order
+	tramp(kernel_arguments.to_ptr(), kernel_entry + kernel_pages.get() as usize, address_space_ptr, stack.to_ptr());
 }
 
 #[panic_handler]

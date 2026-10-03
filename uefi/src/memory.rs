@@ -11,66 +11,91 @@ use super::{
 };
 
 #[repr(transparent)]
-#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct Attribute(u64);
+
+impl Debug for Attribute {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		f.debug_list().entries(Self::ALL.iter().filter(|&&(b, _)| self.0 & b.0 != 0).map(|&(_, n)| n)).finish()
+	}
+}
 
 impl Attribute {
 	/// Supports memory region being configured to not cacheable.
-	pub const UNCACHEABLE: Self = Self(0x0000000000000001);
+	pub const UNCACHEABLE: Self = Self(0x0000_0000_0000_0001);
 	/// Supports memory region being configured as write combining.
-	pub const WRITE_COMBINING: Self = Self(0x0000000000000002);
+	pub const WRITE_COMBINING: Self = Self(0x0000_0000_0000_0002);
 	/// Supports memory region being configured as cacheable with a "write through" policy.
 	/// Writes that hit in cache will also be written to main memory
-	pub const WRITE_THROUGH: Self = Self(0x0000000000000004);
+	pub const WRITE_THROUGH: Self = Self(0x0000_0000_0000_0004);
 	/// Supports memory region being configured as cacheable with a "write back" policy.
 	/// Reads and writes that hit the cache do not propagate to main memory. Dirty data is
 	/// written back to main memory when a new cache line is allocated.
-	pub const WRITE_BACK: Self = Self(0x0000000000000008);
+	pub const WRITE_BACK: Self = Self(0x0000_0000_0000_0008);
 	/// Supports memory region being configured as not cacheable and exported.
 	/// Supports the "fetch and add" semaphore mechanism
-	pub const UNCACHEABLE_EXPORT: Self = Self(0x0000000000000010);
+	pub const UNCACHEABLE_EXPORT: Self = Self(0x0000_0000_0000_0010);
 	/// Supports memory region being configured as write-protected by system hardware.
 	/// Supports being configured as cacheable with a "write protected" policy.
 	/// Reads come from cache lines when possible and read misses cause cache fills.
 	/// Writes probagated to system bus and cause corresponding cache lines on all processors
 	/// on the bus to be invalidated
-	pub const WRITE_PROTECT: Self = Self(0x0000000000001000);
+	pub const WRITE_PROTECT: Self = Self(0x0000_0000_0000_1000);
 	/// Supports memory region being configured as read-protected by system hardware.
-	pub const READ_PROTECT: Self = Self(0x0000000000002000);
+	pub const READ_PROTECT: Self = Self(0x0000_0000_0000_2000);
 	/// Supports memory region being configured to be protected by system hardware from
 	/// executing code.
-	pub const EXECUTE_PROTECT: Self = Self(0x0000000000004000);
+	pub const EXECUTE_PROTECT: Self = Self(0x0000_0000_0000_4000);
 	/// Refers to persistent memory
-	pub const NONVOLATILE: Self = Self(0x0000000000008000);
+	pub const NONVOLATILE: Self = Self(0x0000_0000_0000_8000);
 	/// Memory region provides higher reliability relative to other memory in the system.
 	/// If all memory has the same reliability then this isn't used.
-	pub const MORE_RELIABLE: Self = Self(0x0000000000010000);
+	pub const MORE_RELIABLE: Self = Self(0x0000_0000_0001_0000);
 	/// Supports memory region being configured as read-only by system hardware.
-	pub const READ_ONLY: Self = Self(0x0000000000020000);
+	pub const READ_ONLY: Self = Self(0x0000_0000_0002_0000);
 	/// Memory is earmarked for specific purposes such as for device specific drivers or
 	/// applications. Serves as a hint to OS to aviod allocating this memory for core OS data or
 	/// code that can not be relocated. Prolonged use of this memory for purposes other than the
 	/// intended purpose may result in suboptimal platform performance
-	pub const SPECIFIC_PURPOSE: Self = Self(0x0000000000040000);
+	pub const SPECIFIC_PURPOSE: Self = Self(0x0000_0000_0004_0000);
 	/// If this flag is set the memory region is capable of being protected with CPU's memory
 	/// cryptographic capabilities. If this flag is clear the memory region is not capable of being
 	/// protected with the cpu's memory cryptographic capabilities.
-	pub const CPU_CRYPTO: Self = Self(0x0000000000080000);
+	pub const CPU_CRYPTO: Self = Self(0x0000_0000_0008_0000);
 	/// If this flag is set the memory region is present and capable of having memory dynamically
 	/// removed from the platform. This serves as a hint to the OS prior to ACPI subsystem
 	/// initialization to avoid allocating this memory for core OS data or code that can't be
 	/// dynamically relocated at runtime. If it is clear then the memory region can't be
 	/// dynamically removed from the platform at runtime.
-	pub const HOT_PLUGGABLE: Self = Self(0x0000000000100000);
-	/// Memory region needs to be given a virtual mapping by OS when SetVirtualAddressMap() is
-	/// called.
-	pub const RUNTIME: Self = Self(0x8000000000000000);
+	pub const HOT_PLUGGABLE: Self = Self(0x0000_0000_0010_0000);
 	/// If this flag is set the memory region is described with additional ISA-specific memory
 	/// attributes as specified in ISA_MASK
-	pub const ISA_VALID: Self = Self(0x4000000000000000);
+	pub const ISA_VALID: Self = Self(0x4000_0000_0000_0000);
+	/// Memory region needs to be given a virtual mapping by OS when SetVirtualAddressMap() is
+	/// called.
+	pub const RUNTIME: Self = Self(0x8000_0000_0000_0000);
 	/// Defines the bits reserved for describing optional ISA-specific cacheability attributes that
 	/// are not covered by the standard  UEFI Memory Attributes cacheability bits.
 	pub const ISA_MASK: Self = Self(0x0FFFF00000000000);
+
+	const ALL: [(Attribute, &str); 16] = [
+		(Self::UNCACHEABLE, "UNCACHEABLE"),
+		(Self::WRITE_COMBINING, "WRITE COMBINING"),
+		(Self::WRITE_THROUGH, "WRITE THROUGH"),
+		(Self::WRITE_BACK, "WRITE BACK"),
+		(Self::UNCACHEABLE_EXPORT, "UNCACHEABLE EXPORT"),
+		(Self::WRITE_PROTECT, "WRITE PROTECT"),
+		(Self::READ_PROTECT, "READ PROTECT"),
+		(Self::EXECUTE_PROTECT, "EXECUTE PROTECT"),
+		(Self::NONVOLATILE, "NONVOLATILE"),
+		(Self::MORE_RELIABLE, "MORE RELIABLE"),
+		(Self::READ_ONLY, "READ ONLY"),
+		(Self::SPECIFIC_PURPOSE, "SPECIFIC PURPOSE"),
+		(Self::CPU_CRYPTO, "CPU CRYPTO"),
+		(Self::HOT_PLUGGABLE, "HOT PLUGGABLE"),
+		(Self::ISA_VALID, "ISA VALID"),
+		(Self::RUNTIME, "RUNTIME"),
+	];
 }
 
 /// MemoryType values in the range 0x70000000..0x7FFFFFFF are reserved for OEM
@@ -180,16 +205,18 @@ impl<'a> Pool<'a> {
 #[derive(Debug)]
 pub struct MemoryMap<'a> {
 	data: Pool<'a>,
+	map_size: usize,
 	pub(crate) map_key: usize,
 	descriptor_size: usize,
 	descriptor_version: u32,
 }
 
 impl<'a> MemoryMap<'a> {
-	pub(crate) unsafe fn new(data: Pool<'a>, map_key: usize, descriptor_size: usize, descriptor_version: u32) -> Self {
+	pub(crate) unsafe fn new(data: Pool<'a>, map_size: usize, map_key: usize, descriptor_size: usize, descriptor_version: u32) -> Self {
 		if descriptor_version >= MemoryDescriptor::VERSION && descriptor_size >= size_of::<MemoryDescriptor>() {
 			Self {
 				data,
+				map_size,
 				map_key,
 				descriptor_size,
 				descriptor_version,
@@ -205,7 +232,7 @@ impl<'a> MemoryMap<'a> {
 
 	/// Memory Map Pointer, Memory Map size, Map Key, Descriptor Size, Descriptor Version
 	pub fn deconstruct(mut self) -> (*mut c_void, usize, usize, usize, u32) {
-		(self.data.as_mut_ptr(), self.data.len(), self.map_key, self.descriptor_size, self.descriptor_version)
+		(self.data.as_mut_ptr(), self.map_size, self.map_key, self.descriptor_size, self.descriptor_version)
 	}
 }
 
@@ -219,17 +246,19 @@ fn chunk_to_descriptor_mut(c: &mut [u8]) -> &mut MemoryDescriptor {
 
 impl<'a> IntoIterator for &'a MemoryMap<'_> {
 	type Item = &'a MemoryDescriptor;
-	type IntoIter = Map<slice::ChunksExact<'a, u8>, fn(&[u8]) -> &MemoryDescriptor>;
+	type IntoIter = Map<slice::Chunks<'a, u8>, fn(&[u8]) -> &MemoryDescriptor>;
 	fn into_iter(self) -> Self::IntoIter {
-		self.data.as_slice().chunks_exact(self.descriptor_size).map(chunk_to_descriptor)
+		let slice = unsafe { slice::from_raw_parts(self.data.as_ptr() as *const u8, self.map_size) };
+		slice.chunks(self.descriptor_size).map(chunk_to_descriptor)
 	}
 }
 
 impl<'a> IntoIterator for &'a mut MemoryMap<'_> {
 	type Item = &'a mut MemoryDescriptor;
-	type IntoIter = Map<slice::ChunksExactMut<'a, u8>, fn(&mut [u8]) -> &mut MemoryDescriptor>;
+	type IntoIter = Map<slice::ChunksMut<'a, u8>, fn(&mut [u8]) -> &mut MemoryDescriptor>;
 	fn into_iter(self) -> Self::IntoIter {
-		self.data.as_mut_slice().chunks_exact_mut(self.descriptor_size).map(chunk_to_descriptor_mut)
+		let slice = unsafe { slice::from_raw_parts_mut(self.data.as_mut_ptr() as *mut u8, self.map_size) };
+		slice.chunks_mut(self.descriptor_size).map(chunk_to_descriptor_mut)
 	}
 }
 
